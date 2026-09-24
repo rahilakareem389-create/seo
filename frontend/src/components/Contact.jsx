@@ -23,13 +23,19 @@ function Contact() {
     setStatus("Sending...");
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "";
-      const response = await fetch(`${apiUrl}/api/contact`, {
+      const payload = {
+        access_key: "6d6e0418-bb66-48ed-81eb-aaf8f0a9486d",
+        ...formData,
+        subject: `New Contact Message from ${formData.name}`,
+      };
+
+      const response = await fetch("https://api.web3forms.com/submit", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       let data;
@@ -40,7 +46,7 @@ function Contact() {
         data = { message: "Unexpected response from the server" };
       }
 
-      if (!response.ok) {
+      if (!response.ok || !data.success) {
         throw new Error(data.message || "Something went wrong");
       }
 
