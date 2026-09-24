@@ -1,6 +1,5 @@
 const express = require("express");
 const cors = require("cors");
-const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 const app = express();
@@ -14,15 +13,6 @@ app.use(
 );
 
 app.use(express.json());
-
-// Gmail transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 // Test route
 app.get("/", (req, res) => {
@@ -51,34 +41,29 @@ app.post("/api/contact", async (req, res) => {
   }
 
   try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER,
-      replyTo: email,
-      subject: `New Contact Message from ${name}`,
-      text: `
-New Contact Form Message
-
-Name: ${name}
-Email: ${email}
-
-Message:
-${message}
-      `,
-      html: `
-        <h2>New Contact Form Message</h2>
-
-        <p><strong>Name:</strong> ${name}</p>
-
-        <p><strong>Email:</strong> ${email}</p>
-
-        <p><strong>Message:</strong></p>
-
-        <p>${message}</p>
-      `,
+    const web3Response = await fetch("https://api.web3forms.com/submit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        access_key: "6d6e0418-bb66-48ed-81eb-aaf8f0a9486d",
+        name: name,
+        email: email,
+        message: message,
+        subject: `New Contact Message from ${name}`,
+      }),
     });
 
-    console.log("Email sent successfully!");
+    const data = await web3Response.json();
+
+    if (!web3Response.ok || !data.success) {
+      console.error("Web3Forms error:", data);
+      throw new Error(data.message || "Failed to send email");
+    }
+
+    console.log("Email sent successfully via Web3Forms!");
 
     res.status(200).json({
       success: true,
