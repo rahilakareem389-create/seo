@@ -1,217 +1,118 @@
-import { Mail, MapPin, Phone, ArrowUp } from "lucide-react";
+import React from 'react';
+import { personalInfo } from '../data/portfolioData';
+import { useLanguage } from '../context/LanguageContext';
 
-function Footer() {
-  const handleScrollTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+const Footer = ({ setActiveTab }) => {
+  const { t } = useLanguage();
+
+  const handleNav = (tab) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <footer className="border-t border-white/10 bg-black">
-
-      {/* Footer Main */}
-      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-16 md:grid-cols-2 lg:grid-cols-4">
-
-        {/* Brand */}
-        <div>
-          <a
-            href="#home"
-            className="text-2xl font-bold"
-          >
-            Rank<span className="text-orange-500">Boost</span>
-          </a>
-
-          <p className="mt-5 max-w-sm leading-7 text-gray-400">
-            We help businesses improve their search rankings,
-            increase organic traffic, and grow their online presence.
-          </p>
-
-          {/* Social Links */}
-          <div className="mt-6 flex gap-3">
-
-            <a
-              href="https://www.facebook.com/profile.php?id=61563926198846"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 font-bold text-gray-400 hover:border-orange-500 hover:text-orange-500"
-            >
-              f
-            </a>
-
+    <footer className="border-t border-[var(--line)] pt-12 pb-8 text-[var(--mute)] text-[14.5px] bg-[var(--bg)]">
+      <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         
-
-            <a
-              href="www.linkedin.com/in/rahila-kareem-06b76a31a"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 font-bold text-gray-400 hover:border-orange-500 hover:text-orange-500"
-            >
-              in
-            </a>
-
-            <a
-              href="#"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 font-bold text-gray-400 hover:border-orange-500 hover:text-orange-500"
-            >
-              X
-            </a>
-
-          </div>
-        </div>
-
-        {/* Quick Links */}
-        <div>
-          <h3 className="text-lg font-semibold text-white">
-            Quick Links
-          </h3>
-
-          <ul className="mt-5 space-y-3">
-            <li>
-              <a
-                href="#home"
-                className="text-gray-400 hover:text-orange-500"
-              >
-                Home
-              </a>
-            </li>
-
-            <li>
-              <a
-                href="#about"
-                className="text-gray-400 hover:text-orange-500"
-              >
-                About
-              </a>
-            </li>
-
-            <li>
-              <a
-                href="#services"
-                className="text-gray-400 hover:text-orange-500"
-              >
-                Services
-              </a>
-            </li>
-
-            <li>
-              <a
-                href="#contact"
-                className="text-gray-400 hover:text-orange-500"
-              >
-                Contact
-              </a>
-            </li>
-          </ul>
-        </div>
-
-        {/* Services */}
-        <div>
-          <h3 className="text-lg font-semibold text-white">
-            Services
-          </h3>
-
-          <ul className="mt-5 space-y-3">
-            <li className="text-gray-400">
-              Keyword Research
-            </li>
-
-            <li className="text-gray-400">
-              Technical SEO
-            </li>
-
-            <li className="text-gray-400">
-              On-Page SEO
-            </li>
-
-            <li className="text-gray-400">
-              Link Building
-            </li>
-          </ul>
-        </div>
-
-        {/* Contact */}
-        <div>
-          <h3 className="text-lg font-semibold text-white">
-            Contact Us
-          </h3>
-
-          <div className="mt-5 space-y-4">
-
-            <div className="flex gap-3">
-              <Mail
-                size={20}
-                className="mt-1 shrink-0 text-orange-500"
-              />
-
-              <span className="text-gray-400">
-                wordpressrahila@gmail.com
-              </span>
-            </div>
-
-            <div className="flex gap-3">
-              <Phone
-                size={20}
-                className="mt-1 shrink-0 text-orange-500"
-              />
-
-              <span className="text-gray-400">
-                +92 321 7812265
-              </span>
-            </div>
-
-            <div className="flex gap-3">
-              <MapPin
-                size={20}
-                className="mt-1 shrink-0 text-orange-500"
-              />
-
-              <span className="text-gray-400">
-                Lahore, Pakistan
-              </span>
-            </div>
-
-          </div>
-        </div>
-
-      </div>
-
-      {/* Bottom */}
-      <div className="border-t border-white/10">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-5 sm:flex-row">
-
-          <p className="text-sm text-gray-500">
-            © {new Date().getFullYear()} RankBoost. All rights reserved.
-          </p>
-
-          <div className="flex items-center gap-5 text-sm text-gray-500">
-
-            <a
-              href="#"
-              className="hover:text-orange-500"
-            >
-              Privacy Policy
-            </a>
-
-            <a
-              href="#"
-              className="hover:text-orange-500"
-            >
-              Terms & Conditions
-            </a>
-
+        {/* 3 Columns */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pb-8">
+          
+          {/* Logo & Intro */}
+          <div className="md:col-span-6">
             <button
-              onClick={handleScrollTop}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-white hover:bg-orange-600"
-              title="Back to top"
+              onClick={() => handleNav('home')}
+              className="flex items-center mb-4 cursor-pointer text-left focus:outline-none group"
+              title="Unity Space by Rahila Kareem"
             >
-              <ArrowUp size={18} />
+              <img
+                src="/logo-usk-dark.png"
+                alt="Unity Space by Rahila Kareem"
+                className="logo-theme-dark h-[50px] sm:h-[58px] w-auto max-w-[280px] object-contain transition-transform group-hover:scale-105"
+              />
+              <img
+                src="/logo-usk-light.png"
+                alt="Unity Space by Rahila Kareem"
+                className="logo-theme-light h-[50px] sm:h-[58px] w-auto max-w-[280px] object-contain transition-transform group-hover:scale-105"
+              />
             </button>
+            <p className="text-[14.5px] text-[var(--mute)] max-w-md leading-[1.65]">
+              {t('footer.tagline')}
+            </p>
+          </div>
 
+          {/* Quick links */}
+          <div className="md:col-span-3">
+            <h3 className="font-heading font-bold text-[15px] text-white mb-2">
+              {t('footer.quickLinks')}
+            </h3>
+            <div className="space-y-1 text-[14px]">
+              <button onClick={() => handleNav('home')} className="block py-0.5 hover:text-[#ff7a1a] transition-colors cursor-pointer">
+                {t('nav.home')}
+              </button>
+              <button onClick={() => handleNav('about')} className="block py-0.5 hover:text-[#ff7a1a] transition-colors cursor-pointer">
+                {t('nav.about')}
+              </button>
+              <button onClick={() => handleNav('services')} className="block py-0.5 hover:text-[#ff7a1a] transition-colors cursor-pointer">
+                {t('nav.services')}
+              </button>
+              <button onClick={() => handleNav('portfolio')} className="block py-0.5 hover:text-[#ff7a1a] transition-colors cursor-pointer">
+                {t('nav.portfolio')}
+              </button>
+              <button onClick={() => handleNav('pricing')} className="block py-0.5 hover:text-[#ff7a1a] transition-colors cursor-pointer">
+                {t('nav.pricing')}
+              </button>
+              <button onClick={() => handleNav('contact')} className="block py-0.5 hover:text-[#ff7a1a] transition-colors cursor-pointer">
+                {t('nav.contact')}
+              </button>
+            </div>
+          </div>
+
+          {/* Get in touch */}
+          <div className="md:col-span-3">
+            <h3 className="font-heading font-bold text-[15px] text-white mb-2">
+              {t('footer.contactInfo')}
+            </h3>
+            <div className="space-y-1 text-[14px]">
+              <a href={`mailto:${personalInfo.email}`} className="block py-0.5 hover:text-[#ff7a1a] transition-colors break-all">
+                {personalInfo.email}
+              </a>
+              <a href={personalInfo.whatsappUrl} target="_blank" rel="noopener noreferrer" className="block py-0.5 hover:text-[#ff7a1a] transition-colors">
+                WhatsApp: {personalInfo.phone}
+              </a>
+              <a href={personalInfo.fiverrUrl} target="_blank" rel="noopener noreferrer" className="block py-0.5 hover:text-[#ff7a1a] transition-colors">
+                Fiverr Pro
+              </a>
+              <a href={personalInfo.linkedinUrl} target="_blank" rel="noopener noreferrer" className="block py-0.5 hover:text-[#ff7a1a] transition-colors">
+                LinkedIn Profile
+              </a>
+              <a href={personalInfo.facebookUrl} target="_blank" rel="noopener noreferrer" className="block py-0.5 hover:text-[#ff7a1a] transition-colors">
+                Facebook Page
+              </a>
+            </div>
           </div>
 
         </div>
-      </div>
 
+        {/* SEO Keywords strip */}
+        <p className="mt-4 text-[12.5px] border-t border-[#33271f] pt-4 text-[#8a7a70] leading-relaxed">
+          WordPress designer · WordPress developer · WooCommerce · e-commerce website · SEO · responsive web design · MERN Stack · freelance web developer Pakistan
+        </p>
+
+        {/* Copyright & Discreet Admin Portal */}
+        <div className="flex flex-col sm:flex-row items-center justify-between text-[13px] text-[#8a7a70] mt-3 pt-2 gap-2">
+          <p>© {new Date().getFullYear()} Rahila Kareem. {t('footer.allRights')}</p>
+          <button
+            onClick={() => handleNav('admin')}
+            className="text-[12px] text-[#8a7a70] hover:text-[#D57C63] transition-colors cursor-pointer flex items-center gap-1.5"
+            title="Owner Portal (wordpressrahila@gmail.com)"
+          >
+            <span>Admin Portal</span>
+          </button>
+        </div>
+
+      </div>
     </footer>
   );
-}
+};
 
 export default Footer;
