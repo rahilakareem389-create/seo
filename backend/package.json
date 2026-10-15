@@ -1,7 +1,7 @@
 {
-  "name": "rankboost-backend",
+  "name": "rahila-kareem-portfolio-backend",
   "version": "1.0.0",
-  "description": "RankBoost SEO Agency Backend",
+  "description": "Rahila Kareem Portfolio Backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
