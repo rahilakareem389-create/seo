@@ -712,42 +712,42 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 pt-3">
                 {filteredReviews.map((rev, idx) => {
                   const isReplyExpanded = Boolean(expandedReplies[rev.id]);
                   return (
                     <div
                       key={rev.id}
-                      className="reveal-up relative pt-6 sm:pt-8"
+                      className="reveal-up relative pt-4 sm:pt-5"
                       style={{ transitionDelay: `${(idx % 3) * 100}ms` }}
                     >
-                      {/* 1. Offset Backdrop Shape (matches the yellow/orange block in reference) */}
+                      {/* 1. Offset Backdrop Shape (Compact & sleek) */}
                       <div 
-                        className="absolute -left-2 sm:-left-3 top-10 bottom-5 w-[85%] sm:w-[88%] rounded-2xl bg-gradient-to-r from-[#ff7a1a] via-[#f59e0b] to-[#ea580c] opacity-90 shadow-md transform -rotate-1 pointer-events-none" 
+                        className="absolute -left-1.5 sm:-left-2 top-6 bottom-3 w-[88%] rounded-2xl bg-gradient-to-r from-[#ff7a1a] via-[#f59e0b] to-[#ea580c] opacity-90 shadow-md transform -rotate-1 pointer-events-none" 
                       />
 
-                      {/* 2. Main Quotation Frame with Thick Rounded Border */}
-                      <div className="relative rounded-[32px] bg-[#1a120e] border-[3px] border-[#eedfd5]/90 p-6 sm:p-7 pt-9 pb-7 shadow-2xl flex flex-col justify-between min-h-[350px] transition-all duration-300 hover:border-[#ff7a1a] group">
+                      {/* 2. Main Quotation Frame (Compact size with crisp border) */}
+                      <div className="relative rounded-[24px] bg-[#1a120e] border-2 border-[#eedfd5]/90 p-5 sm:p-6 pt-7 pb-5 shadow-xl flex flex-col justify-between transition-all duration-300 hover:border-[#ff7a1a] group">
                         
-                        {/* Top Quotation Mark “ (breaks top border) */}
-                        <div className="absolute -top-5 left-8 sm:left-12 px-2.5 bg-[#1a120e] z-10 flex items-center justify-center">
-                          <span className="font-serif text-5xl sm:text-6xl font-black text-[#ff7a1a] leading-none select-none">
+                        {/* Top Quotation Mark “ (Sleek size) */}
+                        <div className="absolute -top-3.5 left-6 sm:left-8 px-2 bg-[#1a120e] z-10 flex items-center justify-center">
+                          <span className="font-serif text-3xl sm:text-4xl font-black text-[#ff7a1a] leading-none select-none">
                             “
                           </span>
                         </div>
 
-                        {/* Bottom Quotation Mark ” (breaks bottom border) */}
-                        <div className="absolute -bottom-6 right-10 sm:right-14 px-2.5 bg-[#1a120e] z-10 flex items-center justify-center">
-                          <span className="font-serif text-5xl sm:text-6xl font-black text-[#ff7a1a] leading-none select-none">
+                        {/* Bottom Quotation Mark ” (Sleek size) */}
+                        <div className="absolute -bottom-4 right-8 sm:right-10 px-2 bg-[#1a120e] z-10 flex items-center justify-center">
+                          <span className="font-serif text-3xl sm:text-4xl font-black text-[#ff7a1a] leading-none select-none">
                             ”
                           </span>
                         </div>
 
-                        {/* 3. Tilted Polaroid Photo Card at Top Right with Paperclip */}
-                        <div className="absolute -top-7 -right-2 sm:-top-9 sm:-right-3 z-20 transition-transform duration-300 group-hover:rotate-0 group-hover:scale-105">
+                        {/* 3. Tilted Polaroid Photo Card at Top Right with Paperclip (Compact) */}
+                        <div className="absolute -top-5 -right-1 sm:-top-6 sm:-right-2 z-20 transition-transform duration-300 group-hover:rotate-0 group-hover:scale-105">
                           {/* Paperclip Graphic 📎 */}
                           <svg 
-                            className="w-5 h-8 sm:w-6 sm:h-9 text-neutral-900 drop-shadow-md -rotate-12 absolute -top-3.5 left-1/2 -translate-x-1/2 z-30 pointer-events-none" 
+                            className="w-4 h-6 text-neutral-900 drop-shadow -rotate-12 absolute -top-2.5 left-1/2 -translate-x-1/2 z-30 pointer-events-none" 
                             viewBox="0 0 24 36" 
                             fill="none" 
                             stroke="currentColor" 
@@ -759,15 +759,15 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                           </svg>
 
                           {/* Polaroid Frame */}
-                          <div className="bg-white p-1.5 sm:p-2 pb-5 sm:pb-6 rounded-sm shadow-[0_15px_30px_rgba(0,0,0,0.6)] border border-neutral-200 rotate-6 sm:rotate-8 group-hover:rotate-0 transition-transform">
+                          <div className="bg-white p-1 pb-3 sm:pb-3.5 rounded-sm shadow-md border border-neutral-200 rotate-6 sm:rotate-8 group-hover:rotate-0 transition-transform">
                             {rev.avatar ? (
                               <img
                                 src={rev.avatar}
                                 alt={rev.name}
-                                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xs"
+                                className="w-11 h-11 sm:w-13 sm:h-13 object-cover rounded-xs"
                               />
                             ) : (
-                              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-[#ff7a1a] to-[#ea580c] flex items-center justify-center font-heading font-black text-xl text-white">
+                              <div className="w-11 h-11 sm:w-13 sm:h-13 bg-gradient-to-br from-[#ff7a1a] to-[#ea580c] flex items-center justify-center font-heading font-black text-sm text-white">
                                 {rev.name?.charAt(0) || 'U'}
                               </div>
                             )}
@@ -775,40 +775,40 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                         </div>
 
                         {/* Review Content */}
-                        <div className="pt-2">
-                          {/* Testimonial Quote Message (Clean, readable) */}
-                          <div className="mb-4 pr-12 sm:pr-16">
+                        <div>
+                          {/* Testimonial Quote Message (Bright visible text, clamped to 2-3 lines) */}
+                          <div className="mb-3 pr-9 sm:pr-11">
                             {rev.title && (
-                              <h5 className="font-heading font-extrabold text-[15px] sm:text-[16px] text-white mb-2 leading-snug">
+                              <h5 className="font-heading font-extrabold text-[14px] sm:text-[15px] text-white mb-1 leading-snug line-clamp-1">
                                 {rev.title}
                               </h5>
                             )}
-                            <p className="text-[13px] sm:text-[14px] text-[#ded3ca] leading-relaxed font-medium">
-                              {rev.message}
+                            <p className="text-[13px] sm:text-[13.5px] text-white font-medium leading-relaxed line-clamp-3">
+                              "{rev.message}"
                             </p>
                           </div>
 
-                          {/* 5 Rating Stars (Centered, exactly like reference) */}
-                          <div className="flex items-center gap-1.5 mb-3 text-amber-400 text-xl sm:text-2xl drop-shadow-[0_0_8px_rgba(251,191,36,0.35)]">
+                          {/* 5 Rating Stars (Clean & bright) */}
+                          <div className="flex items-center gap-1 mb-2.5 text-amber-400 text-base drop-shadow-sm">
                             {Array.from({ length: rev.rating || 5 }).map((_, s) => (
                               <span key={s}>★</span>
                             ))}
                           </div>
 
                           {/* Client Name & Role */}
-                          <div className="pt-3 border-t border-[#33271f]/80 flex items-center justify-between gap-2 flex-wrap">
+                          <div className="pt-2 border-t border-[#33271f]/80 flex items-center justify-between gap-2 flex-wrap">
                             <div>
-                              <h4 className="font-heading font-extrabold text-[15px] sm:text-[16px] text-white leading-tight">
+                              <h4 className="font-heading font-extrabold text-[14px] text-white leading-tight">
                                 {rev.name}
                               </h4>
-                              <p className="text-[12px] text-[#bcab9e] mt-0.5">
+                              <p className="text-[11px] text-neutral-300 mt-0.5">
                                 {rev.role || 'Verified Client'}
                               </p>
                             </div>
 
                             {/* Service Tag */}
                             {rev.service && (
-                              <span className="text-[10.5px] font-bold text-[#ff7a1a] bg-[#ff7a1a]/10 border border-[#ff7a1a]/25 px-2.5 py-0.5 rounded-full truncate max-w-[150px]">
+                              <span className="text-[10px] font-bold text-[#ff7a1a] bg-[#ff7a1a]/15 border border-[#ff7a1a]/30 px-2 py-0.5 rounded-full truncate max-w-[130px]">
                                 {rev.service}
                               </span>
                             )}
@@ -816,18 +816,18 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
 
                           {/* Admin Reply (Collapsible See More) */}
                           {rev.adminReply && rev.adminReply.message && (
-                            <div className="mt-3 pt-3 border-t border-[#33271f]/80">
+                            <div className="mt-2 pt-2 border-t border-[#33271f]/80">
                               <button
                                 type="button"
                                 onClick={() => toggleReply(rev.id)}
-                                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#ff7a1a] hover:text-[#ff9240] transition-colors py-1 cursor-pointer select-none"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#ff7a1a] hover:text-[#ff9240] transition-colors py-0.5 cursor-pointer select-none"
                               >
-                                <MessageSquare className="w-3.5 h-3.5" />
+                                <MessageSquare className="w-3 h-3" />
                                 <span>
-                                  {isReplyExpanded ? 'Hide Owner Reply' : 'See Owner Reply (See More)'}
+                                  {isReplyExpanded ? 'Hide Reply' : 'See Owner Reply (See More)'}
                                 </span>
                                 <ChevronDown
-                                  className={`w-3.5 h-3.5 transition-transform duration-300 ${
+                                  className={`w-3 h-3 transition-transform duration-300 ${
                                     isReplyExpanded ? 'rotate-180' : ''
                                   }`}
                                 />
@@ -835,12 +835,12 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
 
                               {/* Collapsible Admin Reply Container */}
                               {isReplyExpanded && (
-                                <div className="mt-2.5 p-3.5 rounded-xl bg-[#281a14] border border-[#ff7a1a]/30 shadow-inner space-y-1.5 animate-fadeIn">
-                                  <div className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#e5937d]">
-                                    <ShieldCheck className="w-3.5 h-3.5 text-[#ff7a1a]" />
-                                    <span>Response from Rahila Kareem (Owner):</span>
+                                <div className="mt-2 p-2.5 rounded-xl bg-[#281a14] border border-[#ff7a1a]/30 shadow-inner space-y-1 animate-fadeIn">
+                                  <div className="flex items-center gap-1 text-[10.5px] font-bold text-[#e5937d]">
+                                    <ShieldCheck className="w-3 h-3 text-[#ff7a1a]" />
+                                    <span>Response from Rahila Kareem:</span>
                                   </div>
-                                  <p className="text-xs text-[#eedfd5] leading-relaxed italic">
+                                  <p className="text-xs text-white leading-relaxed italic line-clamp-3">
                                     "{rev.adminReply.message}"
                                   </p>
                                 </div>
@@ -850,14 +850,14 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                         </div>
 
                         {/* Card Footer: Date & Helpful button */}
-                        <div className="mt-4 pt-3 border-t border-[#33271f]/80 flex items-center justify-between text-xs text-[#a9988d]">
+                        <div className="mt-3 pt-2.5 border-t border-[#33271f]/80 flex items-center justify-between text-[11px] text-neutral-400">
                           <span>{rev.date || 'Recent'}</span>
                           <button
                             type="button"
                             onClick={() => handleLikeReview(rev.id)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-[#ff7a1a]/20 hover:text-[#ff7a1a] transition-colors cursor-pointer text-[11px]"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-[#ff7a1a]/20 hover:text-[#ff7a1a] transition-colors cursor-pointer text-[10.5px]"
                           >
-                            <ThumbsUp className="w-3 h-3" />
+                            <ThumbsUp className="w-2.5 h-2.5" />
                             <span>Helpful ({rev.helpfulCount || 0})</span>
                           </button>
                         </div>
