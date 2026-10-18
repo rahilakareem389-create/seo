@@ -718,83 +718,78 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                   return (
                     <div
                       key={rev.id}
-                      className="reveal-up p-6 sm:p-7 rounded-[28px] bg-gradient-to-b from-[#221813] via-[#1a120e] to-[#120c09] border border-[#ff7a1a]/25 hover:border-[#ff7a1a]/60 shadow-[0_15px_35px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_45px_rgba(255,122,26,0.18)] transition-all duration-300 flex flex-col justify-between group"
+                      className="reveal-up seo-card p-6 sm:p-7 rounded-[28px] flex flex-col justify-between border border-[#33271f] hover:border-[#D57C63]/50 transition-all duration-300 hover:-translate-y-1"
                       style={{ transitionDelay: `${(idx % 3) * 100}ms` }}
                     >
                       <div>
-                        {/* 1. Top Section: Left Image + Right Content (Comment, Rating/Stars, Name) */}
-                        <div className="flex items-start gap-4 sm:gap-5 mb-3">
-                          
-                          {/* Left side pe Image / Avatar with Verified Client Badge */}
-                          <div className="relative shrink-0">
+                        {/* 1. TOP: Client Image / Avatar + Service Tag */}
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                          <div className="relative">
                             {rev.avatar ? (
                               <img
                                 src={rev.avatar}
                                 alt={rev.name}
-                                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-[#ff7a1a]/50 shadow-md ring-2 ring-[#ff7a1a]/15 group-hover:scale-105 transition-transform"
+                                className="w-12 h-12 rounded-full object-cover border-2 border-[#D57C63]/40 shadow-sm"
                               />
                             ) : (
-                              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-[#ff7a1a]/25 to-[#ff6a00]/10 border-2 border-[#ff7a1a]/40 ring-2 ring-[#ff7a1a]/15 flex items-center justify-center font-heading font-extrabold text-lg text-[#ff7a1a] shadow-md group-hover:scale-105 transition-transform">
+                              <div className="w-12 h-12 rounded-full bg-[#D57C63]/20 border border-[#D57C63]/40 flex items-center justify-center font-bold text-sm text-[#D57C63]">
                                 {rev.name?.charAt(0) || 'U'}
                               </div>
                             )}
-                            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[#1a120e] text-black flex items-center justify-center shadow" title="Verified Client">
-                              <Check className="w-3 h-3 stroke-[3]" />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border border-[#1a120e] text-black flex items-center justify-center shadow" title="Verified Client">
+                              <Check className="w-2.5 h-2.5 stroke-[3]" />
                             </div>
                           </div>
 
-                          {/* Content Column (Comment -> Rating & Stars -> Name) */}
-                          <div className="flex-1 min-w-0">
-                            
-                            {/* 2. Top pe Comment */}
-                            <div className="mb-3">
-                              {rev.title && (
-                                <h5 className="font-heading font-extrabold text-sm sm:text-[15px] text-white mb-1 leading-snug line-clamp-2">
-                                  "{rev.title}"
-                                </h5>
-                              )}
-                              <p className="text-xs sm:text-[13px] text-[#ded3ca] leading-relaxed line-clamp-4 group-hover:line-clamp-none transition-all">
-                                "{rev.message}"
-                              </p>
-                            </div>
+                          {/* Service Tag on top right */}
+                          {rev.service && (
+                            <span className="text-[11px] font-bold text-[#D57C63] bg-[#D57C63]/10 px-2.5 py-0.5 rounded-full truncate max-w-[190px]">
+                              {rev.service}
+                            </span>
+                          )}
+                        </div>
 
-                            {/* 3. Us ke niche Rating and Star */}
-                            <div className="flex items-center flex-wrap gap-2 mb-2.5">
-                              <div className="flex text-amber-400 text-sm tracking-tight drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]">
-                                {Array.from({ length: rev.rating || 5 }).map((_, s) => (
-                                  <span key={s}>★</span>
-                                ))}
-                              </div>
-                              <span className="text-xs font-bold text-amber-400/90">
-                                {(rev.rating || 5).toFixed(1)}
-                              </span>
-                              {rev.service && (
-                                <span className="text-[10.5px] font-bold text-[#ff7a1a] bg-[#ff7a1a]/10 border border-[#ff7a1a]/25 px-2 py-0.5 rounded-full truncate max-w-[140px] ml-auto">
-                                  {rev.service}
-                                </span>
-                              )}
-                            </div>
+                        {/* 2. Top pe Comment */}
+                        <div className="mb-4">
+                          {rev.title && (
+                            <h5 className="font-heading font-extrabold text-base text-white mb-2 leading-snug">
+                              "{rev.title}"
+                            </h5>
+                          )}
+                          <p className="text-xs sm:text-[13.5px] text-[#d6c7bc] leading-relaxed line-clamp-4 group-hover:line-clamp-none transition-all">
+                            "{rev.message}"
+                          </p>
+                        </div>
 
-                            {/* 4. Or Name */}
-                            <div className="pt-2 border-t border-[#33271f]/60">
-                              <h4 className="font-heading font-extrabold text-[14.5px] text-white leading-tight">
-                                {rev.name}
-                              </h4>
-                              <p className="text-[11.5px] text-[#bcab9e] mt-0.5 truncate">
-                                {rev.role || 'Verified Client'}
-                              </p>
-                            </div>
-
+                        {/* 3. Us ke niche Rating and Star */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="flex text-amber-400 text-sm">
+                            {Array.from({ length: rev.rating || 5 }).map((_, s) => (
+                              <span key={s}>★</span>
+                            ))}
                           </div>
+                          <span className="text-xs font-bold text-amber-400">
+                            {(rev.rating || 5).toFixed(1)} Rating
+                          </span>
+                        </div>
+
+                        {/* 4. Or Name */}
+                        <div className="pt-3 border-t border-[#33271f] mb-2">
+                          <h4 className="font-heading font-extrabold text-base text-white leading-tight">
+                            {rev.name}
+                          </h4>
+                          <p className="text-xs text-[#a9988d] mt-0.5">
+                            {rev.role || 'Client'}
+                          </p>
                         </div>
 
                         {/* 5. Admin ka reply ider "See More" karne pe user ko nazar aye */}
                         {rev.adminReply && rev.adminReply.message && (
-                          <div className="mt-3 pt-3 border-t border-[#33271f]/80">
+                          <div className="mt-3 pt-3 border-t border-[#33271f]">
                             <button
                               type="button"
                               onClick={() => toggleReply(rev.id)}
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#ff7a1a] hover:text-[#ff9240] transition-colors py-1 cursor-pointer select-none"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#D57C63] hover:text-[#e28c74] transition-colors py-1 cursor-pointer select-none"
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
                               <span>
@@ -809,12 +804,12 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
 
                             {/* Collapsible Admin Reply Container */}
                             {isReplyExpanded && (
-                              <div className="mt-2.5 p-3.5 rounded-xl bg-[#2a1b14] border border-[#ff7a1a]/30 shadow-inner space-y-1.5 animate-fadeIn">
-                                <div className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#e5937d]">
-                                  <ShieldCheck className="w-3.5 h-3.5 text-[#ff7a1a]" />
+                              <div className="mt-2.5 p-3 rounded-xl bg-[#281a14] border border-[#D57C63]/30 space-y-1 animate-fadeIn">
+                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#e28c74]">
+                                  <ShieldCheck className="w-3.5 h-3.5 text-[#e28c74]" />
                                   <span>Response from Rahila Kareem (Owner):</span>
                                 </div>
-                                <p className="text-xs text-[#f1e3d9] leading-relaxed italic">
+                                <p className="text-xs text-[#eedfd5] leading-relaxed italic">
                                   "{rev.adminReply.message}"
                                 </p>
                               </div>
@@ -825,11 +820,11 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
 
                       {/* Card Footer: Date & Helpful button */}
                       <div className="mt-4 pt-3 border-t border-[#33271f] flex items-center justify-between text-xs text-[#a9988d]">
-                        <span>{rev.date || 'Verified Review'}</span>
+                        <span>{rev.date || 'Recent'}</span>
                         <button
                           type="button"
                           onClick={() => handleLikeReview(rev.id)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-[#ff7a1a]/20 hover:text-[#ff7a1a] transition-colors cursor-pointer text-[11px] font-medium"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-[#D57C63]/20 hover:text-[#D57C63] transition-colors cursor-pointer text-[11px]"
                         >
                           <ThumbsUp className="w-3 h-3" />
                           <span>Helpful ({rev.helpfulCount || 0})</span>
