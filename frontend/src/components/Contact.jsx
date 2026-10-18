@@ -3,6 +3,7 @@ import { ArrowLeft, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { personalInfo } from '../data/portfolioData';
 import { useLanguage } from '../context/LanguageContext';
+import { sendWeb3FormsNotification } from '../utils/web3forms';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://portfolio-backend-omega-tan.vercel.app';
 
@@ -39,8 +40,24 @@ const Contact = ({ setActiveTab, selectedPlan }) => {
     e.preventDefault();
     setStatus({ submitting: true, message: t('contact.btnSending') });
 
+    // Always dispatch directly to Web3Forms from browser so it appears in Web3Forms dashboard
+    sendWeb3FormsNotification({
+      type: 'Project Inquiry',
+      subject: `[New Inquiry] ${formData.name} - ${formData.plan}`,
+      name: formData.name,
+      email: formData.email,
+      message: formData.message,
+      details: {
+        clientName: formData.name,
+        clientEmail: formData.email,
+        phoneNumber: formData.phone || 'Not specified',
+        selectedPlan: formData.plan,
+        inquiryMessage: formData.message
+      }
+    });
+
     try {
-      // 1. Backend /api/contact endpoint (sends to Web3Forms + saves to MongoDB Atlas!)
+      // 1. Backend /api/contact endpoint (saves to MongoDB Atlas / JSON)
       const response = await fetch(`${API_BASE_URL}/api/contact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,67 +167,74 @@ const Contact = ({ setActiveTab, selectedPlan }) => {
           
           {/* Left Form Column */}
           <div className="reveal-up lg:col-span-7">
-            <form onSubmit={handleSubmit} className="space-y-4 max-w-[600px]">
+            <form onSubmit={handleSubmit} className="space-y-4 max-w-[640px]">
               
-              <div>
-                <label className="block font-semibold text-sm text-[#f7ede3] mb-1.5">
-                  {t('contact.nameLabel')}
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  placeholder={t('contact.namePlaceholder')}
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  autoComplete="name"
-                  className="w-full px-4 py-3 rounded-[12px] bg-[#1b1411] border-[1.5px] border-[#33271f] text-white focus:outline-none focus:border-[#ff7a1a] transition-colors"
-                />
+              {/* Row 1: 2 Columns (Name & Email) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-sm text-[#f7ede3] mb-1.5">
+                    {t('contact.nameLabel')}
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder={t('contact.namePlaceholder')}
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    autoComplete="name"
+                    className="w-full px-4 py-3 rounded-[12px] bg-[#1b1411] border-[1.5px] border-[#33271f] text-white focus:outline-none focus:border-[#ff7a1a] transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-sm text-[#f7ede3] mb-1.5">
+                    {t('contact.emailLabel')}
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder={t('contact.emailPlaceholder')}
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    autoComplete="email"
+                    className="w-full px-4 py-3 rounded-[12px] bg-[#1b1411] border-[1.5px] border-[#33271f] text-white focus:outline-none focus:border-[#ff7a1a] transition-colors"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-sm text-[#f7ede3] mb-1.5">
-                  {t('contact.emailLabel')}
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  placeholder={t('contact.emailPlaceholder')}
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  autoComplete="email"
-                  className="w-full px-4 py-3 rounded-[12px] bg-[#1b1411] border-[1.5px] border-[#33271f] text-white focus:outline-none focus:border-[#ff7a1a] transition-colors"
-                />
+              {/* Row 2: 2 Columns (Phone & Package) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold text-sm text-[#f7ede3] mb-1.5">
+                    {t('contact.phoneLabel')}
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    placeholder={t('contact.phonePlaceholder')}
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 rounded-[12px] bg-[#1b1411] border-[1.5px] border-[#33271f] text-white focus:outline-none focus:border-[#ff7a1a] transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-sm text-[#f7ede3] mb-1.5">
+                    {t('contact.planLabel')}
+                  </label>
+                  <input
+                    type="text"
+                    name="plan"
+                    value={formData.plan}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 rounded-[12px] bg-[#1b1411] border-[1.5px] border-[#33271f] text-white focus:outline-none focus:border-[#ff7a1a] transition-colors"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-sm text-[#f7ede3] mb-1.5">
-                  {t('contact.phoneLabel')}
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  placeholder={t('contact.phonePlaceholder')}
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-[12px] bg-[#1b1411] border-[1.5px] border-[#33271f] text-white focus:outline-none focus:border-[#ff7a1a] transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-sm text-[#f7ede3] mb-1.5">
-                  {t('contact.planLabel')}
-                </label>
-                <input
-                  type="text"
-                  name="plan"
-                  value={formData.plan}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-[12px] bg-[#1b1411] border-[1.5px] border-[#33271f] text-white focus:outline-none focus:border-[#ff7a1a] transition-colors"
-                />
-              </div>
-
+              {/* Full Width: Message & Details */}
               <div>
                 <label className="block font-semibold text-sm text-[#f7ede3] mb-1.5">
                   {t('contact.messageLabel')}
@@ -273,13 +297,6 @@ const Contact = ({ setActiveTab, selectedPlan }) => {
                   <strong className="text-white block text-xs uppercase text-[#eaa487]">WhatsApp:</strong>
                   <a href={personalInfo.whatsappUrl} target="_blank" rel="noopener noreferrer" className="text-[#ff7a1a] hover:underline">
                     Chat on WhatsApp (Fast response)
-                  </a>
-                </div>
-
-                <div className="pt-2">
-                  <strong className="text-white block text-xs uppercase text-[#eaa487]">Fiverr:</strong>
-                  <a href={personalInfo.fiverrUrl} target="_blank" rel="noopener noreferrer" className="hover:text-[#ff7a1a] transition-colors">
-                    Fiverr Pro Profile
                   </a>
                 </div>
 

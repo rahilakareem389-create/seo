@@ -35,21 +35,22 @@ import {
 } from 'lucide-react';
 import { personalInfo } from '../data/portfolioData';
 import { defaultReviews } from '../data/defaultReviews';
+import { useAuth, mapAuthError, getAdminEmails } from '../context/AuthContext';
 
 const OWNER_EMAIL = 'wordpressrahila@gmail.com';
 const SECONDARY_EMAIL = 'rahilakareem389@gmail.com';
-const ADMIN_PASSWORD = 'rahila2026';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://portfolio-backend-omega-tan.vercel.app';
 
 export default function AdminPage({ setActiveTab }) {
-  // Authentication State
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    try {
-      return sessionStorage.getItem('rahila_admin_authenticated') === 'true';
-    } catch (_) {
-      return false;
-    }
-  });
+  const { user, loginWithEmail, loginWithGoogle, logout, isConfigured } = useAuth();
+  const authorizedAdminEmails = getAdminEmails();
+
+  // Strict Authorization: Firebase authenticated user with verified email in admin email list
+  const isAuthorizedAdmin = Boolean(
+    user &&
+    user.emailVerified &&
+    authorizedAdminEmails.includes((user.email || '').toLowerCase())
+  );
 
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -108,16 +109,26 @@ export default function AdminPage({ setActiveTab }) {
     category: 'SEO & Web Development'
   });
 
+  // Helper: Retrieve authorization headers containing Firebase Bearer token
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('rahila_auth_token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  };
+
   // Fetch real data from live backend
   const fetchAllData = async () => {
     setLoading(true);
+    const headers = getAuthHeaders();
     try {
       const [msgRes, revRes, faqRes, usrRes, statRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/admin/messages`).catch(() => null),
-        fetch(`${API_BASE_URL}/api/admin/reviews`).catch(() => null),
-        fetch(`${API_BASE_URL}/api/admin/faqs`).catch(() => null),
-        fetch(`${API_BASE_URL}/api/admin/users`).catch(() => null),
-        fetch(`${API_BASE_URL}/api/admin/stats`).catch(() => null)
+        fetch(`${API_BASE_URL}/api/admin/messages`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/admin/reviews`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/admin/faqs`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/admin/users`, { headers }).catch(() => null),
+        fetch(`${API_BASE_URL}/api/admin/stats`, { headers }).catch(() => null)
       ]);
 
       if (msgRes && msgRes.ok) {
@@ -165,82 +176,71 @@ export default function AdminPage({ setActiveTab }) {
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthorizedAdmin) {
       fetchAllData();
     }
-  }, [isAuthenticated]);
+  }, [isAuthorizedAdmin]);
 
   const showToast = (msg) => {
     setActionSuccess(msg);
     setTimeout(() => setActionSuccess(''), 3000);
   };
 
-  // Real Login Handler
-  const handleLogin = async (e) => {
+  // Firebase Admin Email Login Handler
+  const handleAdminEmailLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
     setAuthLoading(true);
 
     const cleanEmail = emailInput.trim().toLowerCase();
-    const authorized = [OWNER_EMAIL.toLowerCase(), SECONDARY_EMAIL.toLowerCase()];
 
-    // Verify authorized owner email
-    if (!authorized.includes(cleanEmail)) {
+    // Verify owner email
+    if (!authorizedAdminEmails.includes(cleanEmail)) {
       setAuthLoading(false);
-      setAuthError(`Access Denied: Only Rahila Kareem's verified email (${OWNER_EMAIL}) is authorized.`);
+      setAuthError(`Access Denied: Only Rahila Kareem's authorized email (${authorizedAdminEmails.join(', ')}) is permitted.`);
       return;
     }
 
     try {
-      // Direct call to backend login endpoint
-      const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password: passwordInput.trim() })
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (res.ok && data && data.success) {
-        setIsAuthenticated(true);
-        sessionStorage.setItem('rahila_admin_authenticated', 'true');
-        fetchAllData();
+      const loggedUser = await loginWithEmail(cleanEmail, passwordInput);
+      if (!loggedUser.emailVerified) {
+        setAuthError('Email verification required. Please click the verification link sent to your email.');
+        setAuthLoading(false);
         return;
       }
-      
-      // Fallback local verification if backend unreachable
-      if (passwordInput.trim() === ADMIN_PASSWORD || passwordInput.trim() === 'admin123') {
-        setIsAuthenticated(true);
-        sessionStorage.setItem('rahila_admin_authenticated', 'true');
-        fetchAllData();
-        return;
-      }
-
-      setAuthError(data?.message || `Invalid master password for ${cleanEmail}.`);
+      fetchAllData();
     } catch (err) {
-      if (passwordInput.trim() === ADMIN_PASSWORD || passwordInput.trim() === 'admin123') {
-        setIsAuthenticated(true);
-        sessionStorage.setItem('rahila_admin_authenticated', 'true');
-        fetchAllData();
-        return;
-      }
-      setAuthError('Connection error. Please try again.');
+      console.error('Firebase Admin Login Error:', err);
+      setAuthError(mapAuthError(err));
     } finally {
       setAuthLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    sessionStorage.removeItem('rahila_admin_authenticated');
-    setEmailInput('');
-    setPasswordInput('');
+  // Firebase Admin Google Sign-In Handler
+  const handleAdminGoogleLogin = async () => {
+    setAuthError('');
+    setAuthLoading(true);
+
+    try {
+      const loggedUser = await loginWithGoogle();
+      if (!authorizedAdminEmails.includes((loggedUser.email || '').toLowerCase())) {
+        await logout();
+        setAuthError(`Access Denied: ${loggedUser.email} is not authorized for the Admin Console.`);
+        return;
+      }
+      fetchAllData();
+    } catch (err) {
+      console.error('Firebase Admin Google Login Error:', err);
+      setAuthError(mapAuthError(err));
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
-  // Quick One-Click Auth for Owner
-  const handleQuickOwnerAuth = () => {
-    setEmailInput(OWNER_EMAIL);
-    setPasswordInput(ADMIN_PASSWORD);
+  const handleLogout = async () => {
+    await logout();
+    setActiveTab('home');
   };
 
   // Action: Message status toggle / Reply
@@ -248,7 +248,7 @@ export default function AdminPage({ setActiveTab }) {
     try {
       await fetch(`${API_BASE_URL}/api/admin/messages/${msgId}/reply`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status: newStatus })
       });
       setMessages((prev) =>
@@ -262,7 +262,10 @@ export default function AdminPage({ setActiveTab }) {
   const handleDeleteMessage = async (msgId) => {
     if (!window.confirm('Are you sure you want to delete this inquiry?')) return;
     try {
-      await fetch(`${API_BASE_URL}/api/admin/messages/${msgId}`, { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/api/admin/messages/${msgId}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       setMessages((prev) => prev.filter((m) => m.id !== msgId));
       showToast('Inquiry deleted successfully.');
     } catch (_) {}
@@ -273,7 +276,7 @@ export default function AdminPage({ setActiveTab }) {
     try {
       await fetch(`${API_BASE_URL}/api/admin/reviews/${revId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status })
       });
       setReviews((prev) =>
@@ -291,7 +294,7 @@ export default function AdminPage({ setActiveTab }) {
     try {
       await fetch(`${API_BASE_URL}/api/admin/reviews/${revId}/reply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ replyMessage: text })
       });
 
@@ -320,7 +323,10 @@ export default function AdminPage({ setActiveTab }) {
   const handleDeleteReview = async (revId) => {
     if (!window.confirm('Delete this review permanently?')) return;
     try {
-      await fetch(`${API_BASE_URL}/api/admin/reviews/${revId}`, { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/api/admin/reviews/${revId}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       setReviews((prev) => prev.filter((r) => r.id !== revId));
       showToast('Review deleted.');
     } catch (_) {}
@@ -351,7 +357,7 @@ export default function AdminPage({ setActiveTab }) {
     try {
       await fetch(`${API_BASE_URL}/api/reviews`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newRev)
       });
     } catch (_) {}
@@ -379,7 +385,7 @@ export default function AdminPage({ setActiveTab }) {
     try {
       await fetch(`${API_BASE_URL}/api/admin/faqs/${faqId}/answer`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ answer: text, status: 'approved' })
       });
 
@@ -400,7 +406,10 @@ export default function AdminPage({ setActiveTab }) {
   const handleDeleteFaq = async (faqId) => {
     if (!window.confirm('Delete this question permanently?')) return;
     try {
-      await fetch(`${API_BASE_URL}/api/admin/faqs/${faqId}`, { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/api/admin/faqs/${faqId}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       setFaqs((prev) => prev.filter((f) => f.id !== faqId));
       showToast('FAQ deleted.');
     } catch (_) {}
@@ -426,7 +435,7 @@ export default function AdminPage({ setActiveTab }) {
     try {
       await fetch(`${API_BASE_URL}/api/admin/faqs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newFaq)
       });
     } catch (_) {}
@@ -501,9 +510,12 @@ export default function AdminPage({ setActiveTab }) {
   // =========================================================================
   // VIEW 1: LOGIN GATE SCREEN (STRICT REAL EMAIL VERIFICATION)
   // =========================================================================
-  if (!isAuthenticated) {
+  // =========================================================================
+  // VIEW 1: LOGIN GATE SCREEN (FIREBASE ADMIN AUTHENTICATION)
+  // =========================================================================
+  if (!isAuthorizedAdmin) {
     return (
-      <div className="min-h-screen bg-[#0e0805] text-white flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="min-h-screen bg-[#0e0805] text-white flex items-center justify-center p-4 relative overflow-hidden admin-portal">
         {/* Glow Effects */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#D57C63]/15 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#ff7a1a]/15 rounded-full blur-[140px] pointer-events-none" />
@@ -523,7 +535,7 @@ export default function AdminPage({ setActiveTab }) {
           <div className="p-8 sm:p-10 rounded-[32px] bg-[#170e0a]/90 border border-[#D57C63]/40 shadow-2xl backdrop-blur-xl">
             
             {/* Header */}
-            <div className="text-center mb-8">
+            <div className="text-center mb-6">
               <div className="w-16 h-16 rounded-3xl bg-[#D57C63]/20 border border-[#D57C63]/50 flex items-center justify-center mx-auto text-[#D57C63] mb-4 shadow-inner">
                 <ShieldCheck className="w-8 h-8" />
               </div>
@@ -531,90 +543,123 @@ export default function AdminPage({ setActiveTab }) {
                 Admin Console
               </h1>
               <p className="text-xs sm:text-sm text-[#bcab9e] leading-relaxed">
-                Dedicated management portal strictly reserved for <strong className="text-white">{OWNER_EMAIL}</strong>.
+                Dedicated management portal strictly reserved for verified admin ({OWNER_EMAIL}).
               </p>
             </div>
 
             {/* Error Message */}
             {authError && (
-              <div className="p-3.5 mb-6 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
+              <div className="p-3.5 mb-5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{authError}</span>
               </div>
             )}
 
-            {/* Login Form */}
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#d6c7bc] mb-1.5">
-                  Verified Owner Email
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-[#8a7569] absolute left-3.5 top-3.5" />
-                  <input
-                    type="email"
-                    required
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    placeholder="wordpressrahila@gmail.com"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-sm text-white focus:outline-none focus:border-[#D57C63] transition-all"
-                  />
+            {/* CASE A: User is logged in, but not authorized as admin */}
+            {user ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
+                  <div className="font-bold flex items-center gap-2 text-amber-400">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>Unauthorized Account</span>
+                  </div>
+                  <p className="text-[#bcab9e] text-[11px] leading-relaxed">
+                    Signed in as <strong className="text-white">{user.email}</strong>. This account does not have administrator privileges.
+                  </p>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#d6c7bc] mb-1.5">
-                  Admin Master Password
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-[#8a7569] absolute left-3.5 top-3.5" />
-                  <input
-                    type="password"
-                    required
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-sm text-white focus:outline-none focus:border-[#D57C63] transition-all"
-                  />
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full py-3 rounded-full bg-[#221612] hover:bg-[#2e1d17] border border-[#3e2c22] text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
+                >
+                  <LogOut className="w-4 h-4 text-[#D57C63]" />
+                  <span>Sign Out &amp; Use Admin Account</span>
+                </button>
+              </div>
+            ) : (
+              /* CASE B: User is not logged in - provide Firebase Admin Login */
+              <div className="space-y-4">
+                {/* Google Sign-in */}
+                <button
+                  type="button"
+                  onClick={handleAdminGoogleLogin}
+                  disabled={authLoading}
+                  className="w-full py-2.5 px-4 rounded-xl border border-[#3e2c22] bg-[#221612] hover:bg-[#2d1d17] text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z" />
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
+                    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
+                  </svg>
+                  <span>Sign In with Admin Google Account</span>
+                </button>
+
+                <div className="relative flex items-center justify-center py-1">
+                  <div className="border-t border-[#332219] w-full" />
+                  <span className="bg-[#170e0a] px-2.5 text-[10px] font-bold tracking-wider uppercase text-[#8a7569] shrink-0">
+                    or continue with password
+                  </span>
+                  <div className="border-t border-[#332219] w-full" />
                 </div>
+
+                {/* Login Form */}
+                <form onSubmit={handleAdminEmailLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#d6c7bc] mb-1.5">
+                      Authorized Admin Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-[#8a7569] absolute left-3.5 top-3.5" />
+                      <input
+                        type="email"
+                        required
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        placeholder="wordpressrahila@gmail.com"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-sm text-white focus:outline-none focus:border-[#D57C63] transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#d6c7bc] mb-1.5">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-[#8a7569] absolute left-3.5 top-3.5" />
+                      <input
+                        type="password"
+                        required
+                        value={passwordInput}
+                        onChange={(e) => setPasswordInput(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-sm text-white focus:outline-none focus:border-[#D57C63] transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3 rounded-full glow-btn text-white text-sm font-bold shadow-lg cursor-pointer flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {authLoading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ShieldCheck className="w-4 h-4" />
+                    )}
+                    <span>Authenticate with Firebase</span>
+                  </button>
+                </form>
               </div>
-
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full py-3 rounded-full glow-btn text-white text-sm font-bold shadow-lg cursor-pointer flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-              >
-                {authLoading ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ShieldCheck className="w-4 h-4" />
-                )}
-                <span>Authenticate &amp; Open Portal</span>
-              </button>
-
-              <div className="relative py-2 flex items-center justify-center">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-[#332219]"></div>
-                </div>
-                <span className="relative px-3 bg-[#170e0a] text-[10px] text-[#8a7569] uppercase font-bold tracking-wider">
-                  Owner Quick Fill
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleQuickOwnerAuth}
-                className="w-full py-2.5 rounded-full bg-[#221612] hover:bg-[#2e1d17] border border-[#3e2c22] text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
-              >
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Fill Credentials for {OWNER_EMAIL}</span>
-              </button>
-            </form>
+            )}
 
             <div className="mt-6 pt-4 border-t border-[#291b15] text-center">
               <span className="text-[11px] text-[#8a7569] inline-flex items-center gap-1.5">
                 <Database className="w-3 h-3 text-emerald-400" />
-                <span>Encrypted • MongoDB Atlas &amp; Web3Forms Connected</span>
+                <span>Protected by Firebase Authentication &amp; Role Verification</span>
               </span>
             </div>
 
@@ -628,7 +673,7 @@ export default function AdminPage({ setActiveTab }) {
   // VIEW 2: AUTHENTICATED DEDICATED ADMIN DASHBOARD WITH SIDEBAR
   // =========================================================================
   return (
-    <div className="min-h-screen bg-[#0e0805] text-white flex flex-col md:flex-row relative">
+    <div className="min-h-screen bg-[#0e0805] text-white flex flex-col md:flex-row relative admin-portal">
       
       {/* Toast Notification */}
       {actionSuccess && (
@@ -670,16 +715,16 @@ export default function AdminPage({ setActiveTab }) {
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="font-heading font-black text-base text-white">Master Console</h2>
+              <h2 className="font-heading font-black text-base text-white admin-title">Master Console</h2>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Verified Active</span>
               </span>
             </div>
           </div>
-          <div className="p-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-[11px] text-[#bcab9e] space-y-0.5">
+          <div className="p-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-[11px] text-[#e2d5cb] space-y-0.5">
             <div className="font-bold text-white truncate">Rahila Kareem</div>
-            <div className="text-[#D57C63] truncate">{OWNER_EMAIL}</div>
+            <div className="text-[#D57C63] font-semibold truncate">{OWNER_EMAIL}</div>
           </div>
         </div>
 
@@ -720,13 +765,6 @@ export default function AdminPage({ setActiveTab }) {
               icon: Globe,
               badge: '5.0 ★',
               badgeColor: 'bg-blue-500/20 text-blue-400'
-            },
-            {
-              id: 'cloud',
-              label: 'Atlas & Web3Forms Status',
-              icon: Database,
-              badge: 'Sync OK',
-              badgeColor: 'bg-emerald-500/20 text-emerald-400'
             }
           ].map((item) => {
             const Icon = item.icon;
@@ -741,12 +779,12 @@ export default function AdminPage({ setActiveTab }) {
                 className={`w-full px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
                   isActive
                     ? 'bg-[#D57C63] text-white shadow-lg'
-                    : 'text-[#bcab9e] hover:bg-[#221612] hover:text-white'
+                    : 'text-[#e5d8cd] hover:bg-[#221612] hover:text-white'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-[#D57C63]'}`} />
-                  <span>{item.label}</span>
+                  <span className="font-semibold">{item.label}</span>
                 </div>
                 {item.badge && (
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${item.badgeColor}`}>
@@ -788,17 +826,16 @@ export default function AdminPage({ setActiveTab }) {
         <header className="p-5 sm:p-6 border-b border-[#2d1b14] bg-[#140c08]/80 backdrop-blur-md sticky top-0 z-20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="font-heading font-black text-xl sm:text-2xl text-white capitalize">
+              <h1 className="font-heading font-black text-xl sm:text-2xl text-white admin-title capitalize">
                 {activeSection === 'inquiries' && 'Contact Inquiries & Web3Forms'}
                 {activeSection === 'reviews' && 'Reviews Moderation & Direct Reply'}
                 {activeSection === 'faqs' && 'Community Questions & Admin Answers'}
                 {activeSection === 'users' && 'User Login & Session Audit ("kon login huwa")'}
                 {activeSection === 'gmb' && 'Official Google My Business Integration'}
-                {activeSection === 'cloud' && 'MongoDB Atlas & Web3Forms Cloud Diagnostics'}
               </h1>
             </div>
-            <p className="text-xs text-[#8a7569] mt-0.5">
-              Real-time synchronization with Vercel API, MongoDB Atlas, and Web3Forms key: <code className="text-[#D57C63]">ad131140...</code>
+            <p className="text-xs text-[#d6c7bc] mt-1 font-medium">
+              Real-time synchronization for messages, client reviews, and community questions.
             </p>
           </div>
 
@@ -840,52 +877,52 @@ export default function AdminPage({ setActiveTab }) {
 
           {/* Quick Metrics Bar */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 rounded-2xl bg-[#170e0a] border border-[#2d1b14]">
-              <div className="flex items-center justify-between text-xs text-[#8a7569] mb-1">
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#170e0a] border border-[#2d1b14] shadow-sm">
+              <div className="flex items-center justify-between text-xs text-[#d6c7bc] mb-1.5 font-semibold">
                 <span>Inquiries</span>
                 <Inbox className="w-4 h-4 text-[#D57C63]" />
               </div>
-              <div className="font-heading font-black text-2xl text-white">{messages.length}</div>
-              <div className="text-[11px] text-amber-400 mt-1">{newMessagesCount} New Unhandled</div>
+              <div className="font-heading font-black text-3xl text-white admin-stat-num">{messages.length}</div>
+              <div className="text-[11px] font-bold text-amber-400 mt-1">{newMessagesCount} New Unhandled</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#170e0a] border border-[#2d1b14]">
-              <div className="flex items-center justify-between text-xs text-[#8a7569] mb-1">
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#170e0a] border border-[#2d1b14] shadow-sm">
+              <div className="flex items-center justify-between text-xs text-[#d6c7bc] mb-1.5 font-semibold">
                 <span>Reviews</span>
                 <Star className="w-4 h-4 text-[#ff7a1a]" />
               </div>
-              <div className="font-heading font-black text-2xl text-white">{reviews.length}</div>
-              <div className="text-[11px] text-[#ff7a1a] mt-1">{pendingReviewsCount} Pending Moderation</div>
+              <div className="font-heading font-black text-3xl text-white admin-stat-num">{reviews.length}</div>
+              <div className="text-[11px] font-bold text-[#ff9a7b] mt-1">{pendingReviewsCount} Pending Moderation</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#170e0a] border border-[#2d1b14]">
-              <div className="flex items-center justify-between text-xs text-[#8a7569] mb-1">
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#170e0a] border border-[#2d1b14] shadow-sm">
+              <div className="flex items-center justify-between text-xs text-[#d6c7bc] mb-1.5 font-semibold">
                 <span>FAQs</span>
                 <HelpCircle className="w-4 h-4 text-emerald-400" />
               </div>
-              <div className="font-heading font-black text-2xl text-white">{faqs.length}</div>
-              <div className="text-[11px] text-emerald-400 mt-1">{unansweredFaqsCount} Need Answer</div>
+              <div className="font-heading font-black text-3xl text-white admin-stat-num">{faqs.length}</div>
+              <div className="text-[11px] font-bold text-emerald-400 mt-1">{unansweredFaqsCount} Need Answer</div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#170e0a] border border-[#2d1b14]">
-              <div className="flex items-center justify-between text-xs text-[#8a7569] mb-1">
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#170e0a] border border-[#2d1b14] shadow-sm">
+              <div className="flex items-center justify-between text-xs text-[#d6c7bc] mb-1.5 font-semibold">
                 <span>Active Users</span>
                 <Users className="w-4 h-4 text-blue-400" />
               </div>
-              <div className="font-heading font-black text-2xl text-white">{users.length}</div>
-              <div className="text-[11px] text-blue-400 mt-1">Live Audit Directory</div>
+              <div className="font-heading font-black text-3xl text-white admin-stat-num">{users.length}</div>
+              <div className="text-[11px] font-bold text-blue-400 mt-1">Live Audit Directory</div>
             </div>
           </div>
 
           {/* Search Bar */}
           <div className="relative">
-            <Search className="w-4 h-4 text-[#8a7569] absolute left-4 top-3.5" />
+            <Search className="w-4 h-4 text-[#d6c7bc] absolute left-4 top-3.5" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search across all entries, emails, names, messages..."
-              className="w-full pl-11 pr-4 py-2.5 rounded-2xl bg-[#170e0a] border border-[#2d1b14] text-xs sm:text-sm text-white focus:outline-none focus:border-[#D57C63]"
+              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#170e0a] border border-[#3e2c22] text-xs sm:text-sm text-white focus:outline-none focus:border-[#D57C63] transition-all"
             />
           </div>
 
@@ -903,7 +940,7 @@ export default function AdminPage({ setActiveTab }) {
                     className={`px-4 py-1.5 rounded-full text-xs font-bold capitalize transition-all cursor-pointer ${
                       messageFilter === f
                         ? 'bg-[#D57C63] text-white shadow-md'
-                        : 'bg-[#1e130d] text-[#8a7569] hover:text-white'
+                        : 'bg-[#1e130d] text-[#e0d3c7] hover:text-white'
                     }`}
                   >
                     {f} ({messages.filter((m) => (f === 'all' ? true : m.status === f)).length})
@@ -912,10 +949,10 @@ export default function AdminPage({ setActiveTab }) {
               </div>
 
               {filteredMessages.length === 0 ? (
-                <div className="p-12 text-center rounded-3xl bg-[#170e0a] border border-[#2d1b14] text-[#8a7569]">
-                  <Inbox className="w-10 h-10 mx-auto mb-3 opacity-40 text-[#D57C63]" />
-                  <p className="text-sm font-bold text-white">No contact inquiries found</p>
-                  <p className="text-xs mt-1">When clients submit the contact form, inquiries will appear here and email to {OWNER_EMAIL}.</p>
+                <div className="p-12 text-center rounded-3xl bg-[#170e0a] border border-[#2d1b14] text-[#d6c7bc]">
+                  <Inbox className="w-12 h-12 mx-auto mb-3 opacity-80 text-[#D57C63]" />
+                  <p className="text-base font-bold text-white mb-1.5">No contact inquiries found</p>
+                  <p className="text-xs text-[#d6c7bc] max-w-md mx-auto">When clients submit the contact form, inquiries will appear here and email to {OWNER_EMAIL}.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1369,71 +1406,6 @@ export default function AdminPage({ setActiveTab }) {
                 <div className="p-4 rounded-xl bg-[#221612] border border-[#3e2c22]">
                   <span className="text-[#8a7569] block mb-1">Official GMB Rating</span>
                   <span className="font-bold text-amber-400 text-sm">5.0 ★ (Verified Client Endorsements)</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* =============================================================== */}
-          {/* SECTION 6: CLOUD & MONGODB ATLAS DIAGNOSTICS */}
-          {/* =============================================================== */}
-          {activeSection === 'cloud' && (
-            <div className="p-6 sm:p-8 rounded-3xl bg-[#170e0a] border border-[#2d1b14] space-y-6">
-              <div>
-                <h3 className="font-heading font-black text-lg text-white">Cloud Diagnostics &amp; Sync</h3>
-                <p className="text-xs text-[#8a7569] mt-1">
-                  Architecture status for MongoDB Atlas, Web3Forms, and Vercel serverless persistence.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-5 rounded-2xl bg-[#1e130d] border border-[#332219] space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-[#bcab9e]">
-                    <span>MongoDB Atlas</span>
-                    <Database className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div className="font-heading font-bold text-sm text-emerald-400 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>{cloudStats.mongoDbAtlas || 'Configured & Standby'}</span>
-                  </div>
-                  <p className="text-[11px] text-[#8a7569]">
-                    Dual-layer persistence: Writes to MongoDB Atlas cloud cluster with fallback to high-speed JSON store.
-                  </p>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-[#1e130d] border border-[#332219] space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-[#bcab9e]">
-                    <span>Web3Forms API</span>
-                    <Mail className="w-4 h-4 text-[#ff7a1a]" />
-                  </div>
-                  <div className="font-heading font-bold text-sm text-[#ff7a1a]">
-                    Connected &amp; Active
-                  </div>
-                  <p className="text-[11px] text-[#8a7569]">
-                    Alerts dispatched to <strong className="text-white">{OWNER_EMAIL}</strong> for logins, inquiries, reviews, and questions.
-                  </p>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-[#1e130d] border border-[#332219] space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-[#bcab9e]">
-                    <span>Backend Server (Vercel)</span>
-                    <Globe className="w-4 h-4 text-blue-400" />
-                  </div>
-                  <div className="font-heading font-bold text-sm text-blue-400 truncate">
-                    portfolio-backend-omega-tan.vercel.app
-                  </div>
-                  <p className="text-[11px] text-[#8a7569]">
-                    Serverless API endpoints live with CORS open to frontend.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#221612] border border-[#3e2c22] text-xs space-y-2">
-                <span className="font-bold text-white block">Active Environment Keys</span>
-                <div className="font-mono text-[11px] text-[#8a7569] space-y-1">
-                  <div>WEB3FORMS_ACCESS_KEY: <span className="text-white">ad131140-827b-407f-a476-5afd66b1fa0b</span></div>
-                  <div>OWNER_ACCOUNT: <span className="text-white">{OWNER_EMAIL}</span></div>
-                  <div>FALLBACK_ACCOUNT: <span className="text-white">{SECONDARY_EMAIL}</span></div>
                 </div>
               </div>
             </div>

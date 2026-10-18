@@ -19,11 +19,14 @@ import {
   Send,
   ChevronDown,
   Mail,
-  MapPin
+  MapPin,
+  Upload,
+  Camera
 } from 'lucide-react';
 import { personalInfo } from '../data/portfolioData';
 import { defaultReviews } from '../data/defaultReviews';
 import { defaultFaqs } from '../data/defaultFaqs';
+import { sendWeb3FormsNotification } from '../utils/web3forms';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://portfolio-backend-omega-tan.vercel.app';
@@ -100,9 +103,49 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
     service: 'Complete SEO Strategy',
     rating: 5,
     title: '',
-    message: ''
+    message: '',
+    avatar: ''
   });
   const [reviewSubmitStatus, setReviewSubmitStatus] = useState(null);
+
+  // Avatar Image Upload & Lightweight Canvas Compression
+  const handleAvatarFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (JPG, PNG, WebP).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 300;
+        const MAX_HEIGHT = 300;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        setReviewForm((prev) => ({ ...prev, avatar: compressedDataUrl }));
+      };
+      img.src = readerEvent.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Ask Question Form
   const [questionForm, setQuestionForm] = useState({
@@ -220,6 +263,7 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
       rating: reviewForm.rating,
       title: (reviewForm.title || 'Great Service & Results').trim(),
       message: reviewForm.message.trim(),
+      avatar: reviewForm.avatar || '',
       source: 'Website Submission',
       sourceType: 'submission',
       gmbVerified: false,
@@ -237,6 +281,26 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
       });
     } catch (err) {}
 
+    // Dispatch Web3Forms notification directly to wordpressrahila@gmail.com
+    sendWeb3FormsNotification({
+      type: 'New Client Review',
+      subject: `[New Client Review Submitted] ${reviewForm.rating} Stars by ${reviewForm.name}`,
+      name: reviewForm.name,
+      email: reviewForm.email,
+      message: reviewForm.message,
+      details: {
+        clientName: reviewForm.name,
+        clientEmail: reviewForm.email,
+        roleOrCompany: reviewForm.role || 'Verified Client',
+        serviceDelivered: reviewForm.service,
+        starRating: `${reviewForm.rating} / 5 Stars`,
+        headline: reviewForm.title || 'No Headline',
+        reviewMessage: reviewForm.message,
+        hasUploadedAvatar: Boolean(reviewForm.avatar),
+        moderationStatus: 'Pending Admin Approval in Dashboard'
+      }
+    });
+
     updateReviews([newRev, ...reviews]);
     recordUserEngagement(reviewForm.name, reviewForm.email, reviewForm.role, `Submitted ${reviewForm.rating}-Star Review`);
 
@@ -251,7 +315,8 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
         service: 'Complete SEO Strategy',
         rating: 5,
         title: '',
-        message: ''
+        message: '',
+        avatar: ''
       });
     }, 2200);
   };
@@ -282,6 +347,22 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
         body: JSON.stringify(newQ)
       });
     } catch (err) {}
+
+    // Dispatch Web3Forms notification directly to wordpressrahila@gmail.com
+    sendWeb3FormsNotification({
+      type: 'New Community Question (FAQ)',
+      subject: `[New FAQ Question Asked] From ${questionForm.name}`,
+      name: questionForm.name,
+      email: questionForm.email,
+      message: questionForm.question,
+      details: {
+        authorName: questionForm.name,
+        authorEmail: questionForm.email,
+        category: questionForm.category,
+        questionText: questionForm.question,
+        moderationStatus: 'Pending Admin Answer in Dashboard'
+      }
+    });
 
     updateFaqs([newQ, ...faqs]);
     recordUserEngagement(questionForm.name, questionForm.email, 'Prospective Client', `Asked Question: "${questionForm.question.substring(0, 35)}..."`);
@@ -421,7 +502,6 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
 
   const filteredReviews = publicApprovedReviews.filter((r) => {
     if (activeCategory === 'all') return true;
-    if (activeCategory === 'gmb') return r.sourceType === 'gmb' || r.source?.includes('Google');
     if (activeCategory === 'seo') return r.service?.toLowerCase().includes('seo') || r.service?.toLowerCase().includes('guest');
     if (activeCategory === 'fullstack') return r.service?.toLowerCase().includes('full stack') || r.service?.toLowerCase().includes('mern');
     if (activeCategory === 'wordpress') return r.service?.toLowerCase().includes('wordpress') || r.service?.toLowerCase().includes('woo');
@@ -446,7 +526,7 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
             Client Testimonials &amp; Community Q&amp;A
           </h2>
           <p className="text-[16px] sm:text-[18px] leading-relaxed seo-body">
-            Authentic feedback from verified Google My Business engagements, client deliverables, and community Q&amp;A answered directly by Rahila Kareem.
+            Authentic feedback from client deliverables, project engagements, and community Q&amp;A answered directly by Rahila Kareem.
           </p>
         </div>
 
@@ -543,7 +623,7 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
               }`}
             >
               <Star className="w-4 h-4" />
-              <span>Client Reviews &amp; GMB ({publicApprovedReviews.length})</span>
+              <span>Client Reviews ({publicApprovedReviews.length})</span>
             </button>
 
             <button
@@ -570,7 +650,6 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
             <div className="flex flex-wrap items-center justify-center gap-2.5">
               {[
                 { id: 'all', label: `All Reviews (${publicApprovedReviews.length})` },
-                { id: 'gmb', label: `Google Reviews (GMB)` },
                 { id: 'seo', label: `SEO & Link Building` },
                 { id: 'fullstack', label: `Full Stack Development` },
                 { id: 'wordpress', label: `WordPress & WooCommerce` }
@@ -627,8 +706,6 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                 {filteredReviews.map((rev, idx) => {
-                  const isGmb = rev.sourceType === 'gmb' || rev.source?.includes('Google');
-
                   return (
                     <div
                       key={rev.id}
@@ -653,21 +730,9 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
 
                             <div>
                               <h4 className="font-heading font-extrabold text-base text-white">{rev.name}</h4>
-                              <p className="text-xs text-[#a9988d]">{rev.role || 'Google Verified User'}</p>
+                              <p className="text-xs text-[#a9988d]">{rev.role || 'Client'}</p>
                             </div>
                           </div>
-
-                          {isGmb ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[10.5px] font-bold shrink-0">
-                              <Globe className="w-3 h-3" />
-                              <span>Google Review</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10.5px] font-bold shrink-0">
-                              <Check className="w-3 h-3" />
-                              <span>Verified Client</span>
-                            </span>
-                          )}
                         </div>
 
                         {/* Stars & Service */}
@@ -678,7 +743,7 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                             ))}
                           </div>
                           <span className="text-[11px] font-bold text-[#D57C63] bg-[#D57C63]/10 px-2.5 py-0.5 rounded-full">
-                            {rev.service || 'Google Review'}
+                            {rev.service || 'Client Project'}
                           </span>
                         </div>
 
@@ -811,90 +876,143 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
       {/* ======================================================== */}
       {isWriteReviewModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md overflow-y-auto p-3 sm:p-6 flex justify-center items-start sm:items-center animate-fadeIn"
           onClick={() => setIsWriteReviewModalOpen(false)}
         >
           <div
-            className="relative w-full max-w-xl bg-[#18110e] border-2 border-[#D57C63]/40 rounded-[28px] p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[92vh]"
+            className="dialog-modal-box relative w-full max-w-xl my-auto rounded-[24px] sm:rounded-[28px] p-5 sm:p-7 shadow-2xl overflow-y-auto max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)]"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
               onClick={() => setIsWriteReviewModalOpen(false)}
-              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-[#D57C63] text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="modal-cancel-btn absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-11 h-11 rounded-2xl bg-[#D57C63]/20 border border-[#D57C63]/40 flex items-center justify-center text-[#D57C63]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-[#D57C63]/20 border border-[#D57C63]/40 flex items-center justify-center text-[#D57C63] shrink-0">
                 <MessageSquare className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-heading font-extrabold text-xl text-white">Leave a Verified Review</h3>
-                <p className="text-xs text-[#bcab9e]">Share your experience working with Rahila Kareem.</p>
+                <h3 className="modal-title font-heading font-extrabold text-lg sm:text-xl">Leave a Verified Review</h3>
+                <p className="modal-subtitle text-xs">Share your experience working with Rahila Kareem.</p>
               </div>
             </div>
 
             {reviewSubmitStatus === 'success' ? (
               <div className="py-10 text-center space-y-3">
                 <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto animate-bounce" />
-                <h4 className="font-heading font-bold text-lg text-white">Review Submitted for Verification!</h4>
-                <p className="text-xs text-[#bcab9e] max-w-md mx-auto leading-relaxed">
+                <h4 className="modal-title font-heading font-bold text-lg">Review Submitted for Verification!</h4>
+                <p className="modal-subtitle text-xs max-w-md mx-auto leading-relaxed">
                   Thank you! To ensure 100% genuine reviews, your submission is routed to the Admin Dashboard and will appear on the site once accepted.
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmitReview} className="space-y-4">
-                <div className="p-3 rounded-xl bg-[#D57C63]/10 border border-[#D57C63]/25 text-xs text-[#e29f8c] flex items-start gap-2.5">
+              <form onSubmit={handleSubmitReview} className="space-y-3">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-[#D57C63]/10 border border-[#D57C63]/25 text-xs text-[#e29f8c] flex items-start gap-2.5">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[#D57C63]" />
                   <span>
                     <strong>Authenticity Policy:</strong> Reviews are moderated in the Admin Dashboard to prevent spam.
                   </span>
                 </div>
 
+                {/* Photo / Avatar Upload */}
+                <div className="modal-box-card flex items-center gap-3.5 p-3 rounded-2xl">
+                  <div className="relative shrink-0">
+                    {reviewForm.avatar ? (
+                      <div className="relative">
+                        <img
+                          src={reviewForm.avatar}
+                          alt="Reviewer Avatar"
+                          className="w-12 h-12 rounded-full object-cover border-2 border-[#D57C63] shadow-md"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setReviewForm({ ...reviewForm, avatar: '' })}
+                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-[10px] shadow cursor-pointer"
+                          title="Remove photo"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-[#D57C63]/15 border-2 border-dashed border-[#D57C63]/50 flex items-center justify-center text-[#D57C63]">
+                        <Camera className="w-5 h-5" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <label className="modal-label text-xs font-bold block">
+                        Your Photo / Avatar
+                      </label>
+                      <span className="text-[10px] font-semibold text-[#D57C63] bg-[#D57C63]/10 px-2 py-0.5 rounded-full">
+                        Optional
+                      </span>
+                    </div>
+                    <p className="modal-subtitle text-[11px] mb-2 leading-tight">
+                      Upload your photo to display alongside your verified review.
+                    </p>
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#D57C63]/15 hover:bg-[#D57C63]/25 text-[#D57C63] font-bold text-xs cursor-pointer transition-colors border border-[#D57C63]/30">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{reviewForm.avatar ? 'Change Photo' : 'Upload Photo'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) handleAvatarFile(e.target.files[0]);
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-[#bcab9e] block mb-1">Your Name *</label>
+                    <label className="modal-label text-xs font-bold block mb-1">Your Name *</label>
                     <input
                       type="text"
                       required
                       placeholder="e.g. Jason Blake"
                       value={reviewForm.name}
                       onChange={(e) => setReviewForm({ ...reviewForm, name: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white"
+                      className="modal-input w-full px-3 py-2 rounded-xl text-xs"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-[#bcab9e] block mb-1">Your Real Email *</label>
+                    <label className="modal-label text-xs font-bold block mb-1">Your Real Email *</label>
                     <input
                       type="email"
                       required
                       placeholder="e.g. jason@business.com"
                       value={reviewForm.email}
                       onChange={(e) => setReviewForm({ ...reviewForm, email: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white"
+                      className="modal-input w-full px-3 py-2 rounded-xl text-xs"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-[#bcab9e] block mb-1">Role / Company</label>
+                    <label className="modal-label text-xs font-bold block mb-1">Role / Company</label>
                     <input
                       type="text"
                       placeholder="e.g. Director, SolarTech"
                       value={reviewForm.role}
                       onChange={(e) => setReviewForm({ ...reviewForm, role: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white"
+                      className="modal-input w-full px-3 py-2 rounded-xl text-xs"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-[#bcab9e] block mb-1">Service Delivered</label>
+                    <label className="modal-label text-xs font-bold block mb-1">Service Delivered</label>
                     <select
                       value={reviewForm.service}
                       onChange={(e) => setReviewForm({ ...reviewForm, service: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white"
+                      className="modal-input w-full px-3 py-2 rounded-xl text-xs"
                     >
                       <option>Complete SEO Strategy</option>
                       <option>High DA Guest Posting &amp; GBOB</option>
@@ -906,7 +1024,7 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-[#bcab9e] block mb-1">Star Rating *</label>
+                  <label className="modal-label text-xs font-bold block mb-1">Star Rating *</label>
                   <div className="flex items-center gap-2">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
@@ -914,36 +1032,36 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                         type="button"
                         onClick={() => setReviewForm({ ...reviewForm, rating: star })}
                         className={`text-2xl cursor-pointer ${
-                          star <= reviewForm.rating ? 'text-amber-400' : 'text-neutral-600'
+                          star <= reviewForm.rating ? 'text-amber-400' : 'text-neutral-500'
                         }`}
                       >
                         ★
                       </button>
                     ))}
-                    <span className="text-xs text-amber-400 ml-2 font-bold">{reviewForm.rating} / 5 Stars</span>
+                    <span className="text-xs text-amber-500 ml-2 font-bold">{reviewForm.rating} / 5 Stars</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-[#bcab9e] block mb-1">Headline</label>
+                  <label className="modal-label text-xs font-bold block mb-1">Headline</label>
                   <input
                     type="text"
                     placeholder="e.g. 100% Genuine Backlinks and Great Communication"
                     value={reviewForm.title}
                     onChange={(e) => setReviewForm({ ...reviewForm, title: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white"
+                    className="modal-input w-full px-3 py-2 rounded-xl text-xs"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-[#bcab9e] block mb-1">Review Details *</label>
+                  <label className="modal-label text-xs font-bold block mb-1">Review Details *</label>
                   <textarea
                     required
-                    rows={4}
+                    rows={3}
                     placeholder="Describe your project, results achieved, and feedback..."
                     value={reviewForm.message}
                     onChange={(e) => setReviewForm({ ...reviewForm, message: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white resize-none"
+                    className="modal-input w-full px-3 py-2 rounded-xl text-xs resize-none"
                   />
                 </div>
 
@@ -951,7 +1069,7 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                   <button
                     type="button"
                     onClick={() => setIsWriteReviewModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-white/10 text-xs font-bold"
+                    className="modal-cancel-btn px-4 py-2 rounded-xl text-xs font-bold"
                   >
                     Cancel
                   </button>
@@ -973,71 +1091,71 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
       {/* ======================================================== */}
       {isAskQuestionModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md overflow-y-auto p-3 sm:p-6 flex justify-center items-start sm:items-center animate-fadeIn"
           onClick={() => setIsAskQuestionModalOpen(false)}
         >
           <div
-            className="relative w-full max-w-lg bg-[#18110e] border-2 border-[#D57C63]/40 rounded-[28px] p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[92vh]"
+            className="dialog-modal-box relative w-full max-w-lg my-auto rounded-[24px] sm:rounded-[28px] p-5 sm:p-7 shadow-2xl overflow-y-auto max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)]"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
               onClick={() => setIsAskQuestionModalOpen(false)}
-              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-[#D57C63] text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="modal-cancel-btn absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-11 h-11 rounded-2xl bg-[#D57C63]/20 border border-[#D57C63]/40 flex items-center justify-center text-[#D57C63]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-[#D57C63]/20 border border-[#D57C63]/40 flex items-center justify-center text-[#D57C63] shrink-0">
                 <HelpCircle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-heading font-extrabold text-xl text-white">Ask Rahila Kareem</h3>
-                <p className="text-xs text-[#bcab9e]">Your question will be answered and published to FAQs.</p>
+                <h3 className="modal-title font-heading font-extrabold text-lg sm:text-xl">Ask Rahila Kareem</h3>
+                <p className="modal-subtitle text-xs">Your question will be answered and published to FAQs.</p>
               </div>
             </div>
 
             {questionSubmitStatus === 'success' ? (
               <div className="py-10 text-center space-y-3">
                 <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto animate-bounce" />
-                <h4 className="font-heading font-bold text-lg text-white">Question Sent to Rahila Kareem!</h4>
-                <p className="text-xs text-[#bcab9e] max-w-md mx-auto leading-relaxed">
+                <h4 className="modal-title font-heading font-bold text-lg">Question Sent to Rahila Kareem!</h4>
+                <p className="modal-subtitle text-xs max-w-md mx-auto leading-relaxed">
                   Thank you! Rahila will answer your question in the Admin Dashboard, and it will be published in the FAQ section.
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmitQuestion} className="space-y-4">
+              <form onSubmit={handleSubmitQuestion} className="space-y-3">
                 <div>
-                  <label className="text-xs font-bold text-[#bcab9e] block mb-1">Your Name *</label>
+                  <label className="modal-label text-xs font-bold block mb-1">Your Name *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Sarah Jenkins"
                     value={questionForm.name}
                     onChange={(e) => setQuestionForm({ ...questionForm, name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white"
+                    className="modal-input w-full px-3 py-2 rounded-xl text-xs"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-[#bcab9e] block mb-1">Your Real Email *</label>
+                  <label className="modal-label text-xs font-bold block mb-1">Your Real Email *</label>
                   <input
                     type="email"
                     required
                     placeholder="e.g. sarah@elevatebrands.com"
                     value={questionForm.email}
                     onChange={(e) => setQuestionForm({ ...questionForm, email: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white"
+                    className="modal-input w-full px-3 py-2 rounded-xl text-xs"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-[#bcab9e] block mb-1">Category</label>
+                  <label className="modal-label text-xs font-bold block mb-1">Category</label>
                   <select
                     value={questionForm.category}
                     onChange={(e) => setQuestionForm({ ...questionForm, category: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white"
+                    className="modal-input w-full px-3 py-2 rounded-xl text-xs"
                   >
                     <option>SEO &amp; Guest Posting</option>
                     <option>Full Stack Web Apps</option>
@@ -1048,14 +1166,14 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-[#bcab9e] block mb-1">Your Question *</label>
+                  <label className="modal-label text-xs font-bold block mb-1">Your Question *</label>
                   <textarea
                     required
-                    rows={4}
+                    rows={3}
                     placeholder="Ask anything about SEO, backlinks, web development, or consultations..."
                     value={questionForm.question}
                     onChange={(e) => setQuestionForm({ ...questionForm, question: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-xs text-white resize-none"
+                    className="modal-input w-full px-3 py-2 rounded-xl text-xs resize-none"
                   />
                 </div>
 
@@ -1063,7 +1181,7 @@ export default function Testimonials({ setActiveTab, setSelectedPlan }) {
                   <button
                     type="button"
                     onClick={() => setIsAskQuestionModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-white/10 text-xs font-bold"
+                    className="modal-cancel-btn px-4 py-2 rounded-xl text-xs font-bold"
                   >
                     Cancel
                   </button>

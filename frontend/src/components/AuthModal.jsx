@@ -1,43 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import {
   X,
-  Key,
-  Sparkles,
-  CheckCircle2,
-  Lock,
+  User,
   Mail,
+  Lock,
   ArrowRight,
   ShieldCheck,
   AlertCircle,
   RefreshCw,
-  Check,
-  User,
-  Send,
   Eye,
-  EyeOff
+  EyeOff,
+  CheckCircle2,
+  Sparkles,
+  ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth, mapAuthError } from '../context/AuthContext';
+import { sendWeb3FormsNotification } from '../utils/web3forms';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://portfolio-backend-omega-tan.vercel.app';
+// Official Multicolor Google 'G' SVG
+const GoogleIcon = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+    />
+  </svg>
+);
 
 const AuthModal = ({ isOpen, onClose, initialMode = 'signup', onAuthSuccess }) => {
   const { t } = useLanguage();
+  const {
+    registerWithEmail,
+    loginWithEmail,
+    loginWithGoogle,
+    resendVerificationEmail,
+    checkEmailVerification,
+    isConfigured
+  } = useAuth();
 
   // Mode: 'signup' | 'signin' | 'verify'
   const [mode, setMode] = useState(initialMode || 'signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   // Status & Loading states
   const [loading, setLoading] = useState(false);
+  const [checkingVerification, setCheckingVerification] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Resend OTP cooldown timer
+  // Resend Verification cooldown timer
   const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
@@ -45,7 +73,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signup', onAuthSuccess }) =
       setMode(initialMode || 'signup');
       setErrorMsg('');
       setSuccessMsg('');
-      setOtp('');
     }
   }, [isOpen, initialMode]);
 
@@ -60,24 +87,72 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signup', onAuthSuccess }) =
 
   if (!isOpen) return null;
 
-  // Password rules validation
-  const hasMinLength = password.length >= 8;
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasLowercase = /[a-z]/.test(password);
-  const hasNumber = /\d/.test(password);
-  const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
-  const isPasswordValid = hasMinLength && hasUppercase && hasLowercase && hasNumber && hasSpecial;
-
   const triggerConfetti = () => {
-    confetti({
-      particleCount: 90,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#ff7a1a', '#ffb347', '#25D366', '#ffffff']
-    });
+    try {
+      confetti({
+        particleCount: 90,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#D57C63', '#ff9a7b', '#25D366', '#ffffff']
+      });
+    } catch (_) {}
   };
 
-  // 1. Submit Registration
+  // ==========================================================================
+  // GOOGLE SIGN-IN HANDLER (FIREBASE AUTH POPUP)
+  // ==========================================================================
+  const handleGoogleSignIn = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!isConfigured) {
+      setErrorMsg('Firebase configuration missing. Please add VITE_FIREBASE_* variables in .env.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const firebaseUser = await loginWithGoogle();
+      triggerConfetti();
+
+      // Dispatch Web3Forms notification for audit alert
+      sendWeb3FormsNotification({
+        type: 'Google Login',
+        subject: `[User Login Alert] ${firebaseUser.email} logged in via Google (Firebase Auth)`,
+        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0],
+        email: firebaseUser.email,
+        details: {
+          action: 'Firebase Google OAuth Sign-In',
+          provider: 'Firebase Authentication',
+          userName: firebaseUser.displayName,
+          userEmail: firebaseUser.email,
+          role: 'Client'
+        }
+      });
+
+      setSuccessMsg(`Welcome, ${firebaseUser.displayName || 'Client'}! Signed in with Google.`);
+      if (onAuthSuccess) {
+        onAuthSuccess({
+          uid: firebaseUser.uid,
+          id: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0],
+          emailVerified: firebaseUser.emailVerified,
+          role: 'Client'
+        });
+      }
+      setTimeout(() => onClose(), 1100);
+    } catch (err) {
+      console.error('Firebase Google Sign-In Error:', err);
+      setErrorMsg(mapAuthError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================================================
+  // 1. SUBMIT REGISTRATION (EMAIL + PASSWORD + VERIFICATION EMAIL)
+  // ==========================================================================
   const handleRegister = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -88,119 +163,101 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signup', onAuthSuccess }) =
       return;
     }
 
-    if (!isPasswordValid) {
-      setErrorMsg('Please satisfy all password complexity requirements.');
+    if (password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    if (!isConfigured) {
+      setErrorMsg('Firebase configuration missing. Please add VITE_FIREBASE_* variables in .env.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          password: password
-        })
+      const createdUser = await registerWithEmail(name.trim(), email.trim(), password);
+
+      // Web3Forms notification for admin awareness
+      sendWeb3FormsNotification({
+        type: 'User Registration',
+        subject: `[New Client Registered] ${name.trim()} (${email.trim()})`,
+        name: name.trim(),
+        email: email.trim(),
+        details: {
+          action: 'Firebase Email/Password Registration',
+          userName: name.trim(),
+          userEmail: email.trim(),
+          role: 'Client'
+        }
       });
 
-      const data = await res.json().catch(() => null);
-
-      if (res.ok && data && data.success) {
-        setSuccessMsg(data.message || 'Verification code dispatched to your email!');
-        setMode('verify');
-        setResendCooldown(60);
-      } else {
-        setErrorMsg(data?.message || 'Registration failed. Please check your inputs.');
-      }
+      setSuccessMsg(`Verification email dispatched to ${email.trim()}. Please verify your email before entering your workspace.`);
+      setMode('verify');
+      setResendCooldown(60);
     } catch (err) {
-      setErrorMsg('Network error. Unable to reach server. Please try again.');
+      console.error('Firebase Registration Error:', err);
+      setErrorMsg(mapAuthError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Submit OTP Email Verification
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
+  // ==========================================================================
+  // 2. CHECK EMAIL VERIFICATION STATUS
+  // ==========================================================================
+  const handleCheckVerification = async () => {
     setErrorMsg('');
     setSuccessMsg('');
+    setCheckingVerification(true);
 
-    if (!otp || otp.trim().length < 6) {
-      setErrorMsg('Please enter the complete 6-digit verification code.');
-      return;
-    }
-
-    setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          email: email.trim(),
-          otp: otp.trim()
-        })
-      });
+      const verified = await checkEmailVerification();
 
-      const data = await res.json().catch(() => null);
-
-      if (res.ok && data && data.success) {
+      if (verified) {
         triggerConfetti();
-        if (data.token) {
-          localStorage.setItem('rahila_auth_token', data.token);
+        setSuccessMsg('Email verified successfully! Entering your workspace...');
+        if (onAuthSuccess) {
+          onAuthSuccess({
+            email,
+            name: name || email.split('@')[0],
+            emailVerified: true,
+            role: 'Client'
+          });
         }
-        if (data.user) {
-          localStorage.setItem('rahila_auth_user', JSON.stringify(data.user));
-          if (onAuthSuccess) onAuthSuccess(data.user);
-        }
-
-        setSuccessMsg('Account verified successfully! Entering your workspace...');
-        setTimeout(() => {
-          onClose();
-        }, 1500);
+        setTimeout(() => onClose(), 1200);
       } else {
-        setErrorMsg(data?.message || 'Verification failed. Please check the code and try again.');
+        setErrorMsg('Your email is not verified yet. Please check your inbox (and Spam folder) for the verification link from Firebase, click it, and try again.');
       }
     } catch (err) {
-      setErrorMsg('Network error while verifying OTP.');
+      setErrorMsg(mapAuthError(err));
     } finally {
-      setLoading(false);
+      setCheckingVerification(false);
     }
   };
 
-  // 3. Resend Verification OTP
-  const handleResendOtp = async () => {
+  // ==========================================================================
+  // 3. RESEND VERIFICATION EMAIL
+  // ==========================================================================
+  const handleResendVerification = async () => {
     if (resendCooldown > 0) return;
     setErrorMsg('');
     setSuccessMsg('');
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email: email.trim() })
-      });
-
-      const data = await res.json().catch(() => null);
-      if (res.ok && data && data.success) {
-        setSuccessMsg(data.message || 'A fresh verification code has been dispatched.');
-        setResendCooldown(60);
-      } else {
-        setErrorMsg(data?.message || 'Unable to resend code right now.');
-      }
+      await resendVerificationEmail();
+      setSuccessMsg(`A fresh verification email has been sent to ${email}. Please check your inbox.`);
+      setResendCooldown(60);
     } catch (err) {
-      setErrorMsg('Network error while requesting code.');
+      setErrorMsg(mapAuthError(err));
     } finally {
       setLoading(false);
     }
   };
 
-  // 4. Submit Login
+  // ==========================================================================
+  // 4. SUBMIT LOGIN (EMAIL + PASSWORD)
+  // ==========================================================================
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -211,93 +268,118 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signup', onAuthSuccess }) =
       return;
     }
 
+    if (!isConfigured) {
+      setErrorMsg('Firebase configuration missing. Please add VITE_FIREBASE_* variables in .env.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          email: email.trim(),
-          password: password
-        })
-      });
+      const firebaseUser = await loginWithEmail(email.trim(), password);
 
-      const data = await res.json().catch(() => null);
-
-      if (res.ok && data && data.success) {
-        triggerConfetti();
-        if (data.token) {
-          localStorage.setItem('rahila_auth_token', data.token);
-        }
-        if (data.user) {
-          localStorage.setItem('rahila_auth_user', JSON.stringify(data.user));
-          if (onAuthSuccess) onAuthSuccess(data.user);
-        }
-
-        setSuccessMsg(`Welcome back, ${data.user?.name || 'Client'}!`);
-        setTimeout(() => {
-          onClose();
-        }, 1200);
-      } else if (data?.code === 'UNVERIFIED_EMAIL') {
-        // Automatically route to verification step
-        setErrorMsg(data.message);
+      // Enforce email verification for protected features
+      if (!firebaseUser.emailVerified) {
+        setErrorMsg('Your email is not verified yet. Please verify your email before accessing your workspace.');
         setMode('verify');
         setResendCooldown(30);
-      } else {
-        setErrorMsg(data?.message || 'Invalid email address or password.');
+        setLoading(false);
+        return;
       }
+
+      // Successful verified login
+      triggerConfetti();
+      const userName = firebaseUser.displayName || email.split('@')[0];
+
+      sendWeb3FormsNotification({
+        type: 'User Login',
+        subject: `[User Login Alert] ${email.trim()} logged in to Client Workspace`,
+        name: userName,
+        email: email.trim(),
+        details: {
+          action: 'Firebase Client Login',
+          userName,
+          userEmail: email.trim(),
+          role: 'Client'
+        }
+      });
+
+      setSuccessMsg(`Welcome back, ${userName}!`);
+      if (onAuthSuccess) {
+        onAuthSuccess({
+          uid: firebaseUser.uid,
+          id: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: userName,
+          emailVerified: true,
+          role: 'Client'
+        });
+      }
+      setTimeout(() => onClose(), 1100);
     } catch (err) {
-      setErrorMsg('Network error during login.');
+      console.error('Firebase Login Error:', err);
+      setErrorMsg(mapAuthError(err));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="glass-card modal-enter w-full max-w-md p-6 sm:p-8 rounded-[28px] border border-[var(--org)]/40 relative shadow-2xl bg-[#170e0a] text-white">
+    <div className="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-4 flex items-center justify-center bg-black/75 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-[420px] my-auto p-6 sm:p-7 rounded-3xl relative shadow-2xl transition-all border border-[#e5d6c5] dark:border-[#332219] bg-white dark:bg-[#18110d] text-[#140d07] dark:text-[#f7ede3] max-h-[calc(100vh-2rem)] overflow-y-auto">
         
         {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-white/10 hover:bg-white/20 text-[#bcab9e] hover:text-white transition-colors cursor-pointer"
+          className="absolute top-5 right-5 p-2 rounded-full text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+          aria-label="Close"
         >
           <X className="w-5 h-5" />
         </button>
 
-        {/* Header */}
-        <div className="flex items-center gap-3.5 mb-5">
-          <div className="w-12 h-12 rounded-2xl bg-[#D57C63]/20 border border-[#D57C63]/50 flex items-center justify-center text-[#D57C63] shadow-inner shrink-0">
-            {mode === 'verify' ? (
-              <ShieldCheck className="w-6 h-6 text-emerald-400" />
-            ) : mode === 'signin' ? (
-              <Key className="w-6 h-6" />
-            ) : (
-              <Sparkles className="w-6 h-6" />
-            )}
-          </div>
-          <div>
-            <h3 className="font-heading font-black text-xl text-white">
-              {mode === 'verify'
-                ? 'Verify Email Code'
-                : mode === 'signin'
-                ? 'Client Sign In'
-                : 'Create Client Account'}
-            </h3>
-            <p className="text-xs text-[#bcab9e]">
-              {mode === 'verify'
-                ? 'Single-use cryptographic OTP verification'
-                : mode === 'signin'
-                ? 'Access your private project workspace'
-                : 'Real email verification required to activate'}
+        {/* Configuration Notice if env is missing */}
+        {!isConfigured && (
+          <div className="mb-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs">
+            <div className="font-bold flex items-center gap-1.5 mb-1">
+              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>Firebase Keys Required</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-300">
+              Please paste your Firebase configuration into <code className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono">frontend/.env</code> to enable live authentication.
             </p>
           </div>
+        )}
+
+        {/* Header */}
+        <div className="mb-5">
+          <div className="w-10 h-10 rounded-2xl bg-[#D57C63]/15 text-[#D57C63] flex items-center justify-center mb-3 shadow-sm">
+            {mode === 'verify' ? (
+              <ShieldCheck className="w-5 h-5" />
+            ) : mode === 'signin' ? (
+              <Lock className="w-5 h-5" />
+            ) : (
+              <User className="w-5 h-5" />
+            )}
+          </div>
+          <h3 className="font-heading font-extrabold text-2xl text-neutral-900 dark:text-white tracking-tight">
+            {mode === 'verify'
+              ? 'Verify Your Email'
+              : mode === 'signin'
+              ? 'Welcome Back'
+              : 'Create Client Account'}
+          </h3>
+          <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+            {mode === 'verify'
+              ? 'A verification link was dispatched to your inbox'
+              : mode === 'signin'
+              ? 'Sign in to access your client dashboard & deliverables'
+              : 'Sign up to track your projects & deliverables'}
+          </p>
         </div>
 
-        {/* Mode Switcher Tabs (Hidden during OTP step) */}
+        {/* Mode Switcher Tabs (Segmented Control) */}
         {mode !== 'verify' && (
-          <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[#221612] border border-[#3e2c22] mb-5">
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-neutral-100 dark:bg-[#251812] border border-neutral-200 dark:border-[#38261e] mb-5">
             <button
               type="button"
               onClick={() => {
@@ -305,13 +387,13 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signup', onAuthSuccess }) =
                 setErrorMsg('');
                 setSuccessMsg('');
               }}
-              className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+              className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 mode === 'signup'
-                  ? 'bg-[#D57C63] text-white shadow-md'
-                  : 'text-[#bcab9e] hover:text-white'
+                  ? 'bg-white dark:bg-[#D57C63] text-[#D57C63] dark:text-white shadow-sm'
+                  : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
               }`}
             >
-              ✨ Register Account
+              Sign Up
             </button>
             <button
               type="button"
@@ -320,162 +402,110 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signup', onAuthSuccess }) =
                 setErrorMsg('');
                 setSuccessMsg('');
               }}
-              className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+              className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 mode === 'signin'
-                  ? 'bg-[#D57C63] text-white shadow-md'
-                  : 'text-[#bcab9e] hover:text-white'
+                  ? 'bg-white dark:bg-[#D57C63] text-[#D57C63] dark:text-white shadow-sm'
+                  : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
               }`}
             >
-              🔑 Client Sign In
+              Sign In
             </button>
           </div>
         )}
 
         {/* Status Alerts */}
         {errorMsg && (
-          <div className="p-3.5 mb-4 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div className="p-3 mb-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
             <span>{errorMsg}</span>
           </div>
         )}
 
         {successMsg && (
-          <div className="p-3.5 mb-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+          <div className="p-3 mb-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
             <span>{successMsg}</span>
           </div>
         )}
 
-        {/* ======================================================== */}
-        {/* STEP 1A: REGISTRATION FORM */}
-        {/* ======================================================== */}
+        {/* GOOGLE SIGN-IN BUTTON & DIVIDER (For Sign Up & Sign In) */}
+        {mode !== 'verify' && (
+          <div className="space-y-3 mb-4">
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="w-full py-2.5 px-4 rounded-xl border border-neutral-300 dark:border-[#3d271e] bg-white dark:bg-[#221612] hover:bg-neutral-50 dark:hover:bg-[#2c1c16] text-neutral-800 dark:text-neutral-100 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-sm transition-all duration-200 cursor-pointer disabled:opacity-50 hover:shadow"
+            >
+              <GoogleIcon />
+              <span>Continue with Google</span>
+            </button>
+
+            <div className="relative flex items-center justify-center pt-1">
+              <div className="border-t border-neutral-200 dark:border-[#38261e] w-full" />
+              <span className="bg-white dark:bg-[#18110d] px-2.5 text-[10px] font-bold tracking-wider uppercase text-neutral-400 shrink-0">
+                or continue with email
+              </span>
+              <div className="border-t border-neutral-200 dark:border-[#38261e] w-full" />
+            </div>
+          </div>
+        )}
+
+        {/* STEP 1A: SIGN UP */}
         {mode === 'signup' && (
-          <form onSubmit={handleRegister} className="space-y-3.5 text-xs">
+          <form onSubmit={handleRegister} className="space-y-3.5">
             <div>
-              <label className="block text-[#d6c7bc] font-bold mb-1">Full Name</label>
+              <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">
+                Full Name
+              </label>
               <div className="relative">
-                <User className="w-4 h-4 text-[#8a7569] absolute left-3.5 top-3" />
+                <User className="w-4 h-4 text-neutral-400 absolute left-3.5 top-3" />
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-white text-xs sm:text-sm focus:outline-none focus:border-[#D57C63]"
+                  placeholder="e.g. Sarah Jenkins"
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-neutral-200 dark:border-[#38261e] bg-neutral-50/70 dark:bg-[#20140e] text-neutral-900 dark:text-white placeholder:text-neutral-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#D57C63]/30 focus:border-[#D57C63] transition-all"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[#d6c7bc] font-bold mb-1">Email Address</label>
+              <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">
+                Email Address
+              </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-[#8a7569] absolute left-3.5 top-3" />
+                <Mail className="w-4 h-4 text-neutral-400 absolute left-3.5 top-3" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="client@company.com"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-white text-xs sm:text-sm focus:outline-none focus:border-[#D57C63]"
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-neutral-200 dark:border-[#38261e] bg-neutral-50/70 dark:bg-[#20140e] text-neutral-900 dark:text-white placeholder:text-neutral-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#D57C63]/30 focus:border-[#D57C63] transition-all"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[#d6c7bc] font-bold mb-1">Secure Password</label>
+              <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">
+                Password
+              </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-[#8a7569] absolute left-3.5 top-3" />
+                <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-3" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-white text-xs sm:text-sm focus:outline-none focus:border-[#D57C63]"
+                  placeholder="At least 6 characters"
+                  className="w-full pl-10 pr-10 py-2 rounded-xl border border-neutral-200 dark:border-[#38261e] bg-neutral-50/70 dark:bg-[#20140e] text-neutral-900 dark:text-white placeholder:text-neutral-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#D57C63]/30 focus:border-[#D57C63] transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-3 text-[#8a7569] hover:text-white"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* Password Policy Live Indicators */}
-              <div className="mt-2.5 p-2.5 rounded-xl bg-[#20140e] border border-[#332219] space-y-1 text-[11px]">
-                <span className="text-[#8a7569] font-bold block mb-1">Password Requirements:</span>
-                <div className="grid grid-cols-2 gap-1 text-[10.5px]">
-                  <span className={`flex items-center gap-1.5 ${hasMinLength ? 'text-emerald-400 font-bold' : 'text-[#8a7569]'}`}>
-                    <Check className="w-3 h-3" /> 8+ Characters
-                  </span>
-                  <span className={`flex items-center gap-1.5 ${hasUppercase ? 'text-emerald-400 font-bold' : 'text-[#8a7569]'}`}>
-                    <Check className="w-3 h-3" /> 1 Uppercase Letter
-                  </span>
-                  <span className={`flex items-center gap-1.5 ${hasLowercase ? 'text-emerald-400 font-bold' : 'text-[#8a7569]'}`}>
-                    <Check className="w-3 h-3" /> 1 Lowercase Letter
-                  </span>
-                  <span className={`flex items-center gap-1.5 ${hasNumber ? 'text-emerald-400 font-bold' : 'text-[#8a7569]'}`}>
-                    <Check className="w-3 h-3" /> 1 Number
-                  </span>
-                  <span className={`flex items-center gap-1.5 col-span-2 ${hasSpecial ? 'text-emerald-400 font-bold' : 'text-[#8a7569]'}`}>
-                    <Check className="w-3 h-3" /> 1 Special Character (!@#$%^&*)
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !isPasswordValid}
-              className="w-full py-3 rounded-xl glow-btn text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 mt-2"
-            >
-              {loading ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-              <span>Send Verification Code</span>
-            </button>
-          </form>
-        )}
-
-        {/* ======================================================== */}
-        {/* STEP 1B: SIGN IN FORM */}
-        {/* ======================================================== */}
-        {mode === 'signin' && (
-          <form onSubmit={handleLogin} className="space-y-3.5 text-xs">
-            <div>
-              <label className="block text-[#d6c7bc] font-bold mb-1">Email Address</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-[#8a7569] absolute left-3.5 top-3" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="client@company.com"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-white text-xs sm:text-sm focus:outline-none focus:border-[#D57C63]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[#d6c7bc] font-bold mb-1">Password</label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-[#8a7569] absolute left-3.5 top-3" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#221612] border border-[#3e2c22] text-white text-xs sm:text-sm focus:outline-none focus:border-[#D57C63]"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-3 text-[#8a7569] hover:text-white"
+                  className="absolute right-3.5 top-2.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-white cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -485,83 +515,156 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'signup', onAuthSuccess }) =
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl glow-btn text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 mt-2"
+              className="w-full py-2.5 rounded-xl bg-[#D57C63] hover:bg-[#c2674e] text-white font-bold text-xs sm:text-sm uppercase tracking-wider transition-all duration-200 shadow-md hover:shadow-lg hover:shadow-[#D57C63]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
             >
               {loading ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
               ) : (
-                <Key className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" />
               )}
-              <span>Sign In to Workspace</span>
+              <span>Create Account</span>
             </button>
+
+            <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 pt-1">
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={() => setMode('signin')}
+                className="text-[#D57C63] font-bold hover:underline cursor-pointer"
+              >
+                Sign In
+              </button>
+            </p>
           </form>
         )}
 
-        {/* ======================================================== */}
-        {/* STEP 2: VERIFY EMAIL OTP (SINGLE-USE HASHED TOKEN) */}
-        {/* ======================================================== */}
-        {mode === 'verify' && (
-          <form onSubmit={handleVerifyOtp} className="space-y-4 text-xs">
-            <div className="p-3.5 rounded-2xl bg-[#221612] border border-[#3e2c22] text-center space-y-1">
-              <span className="text-[11px] text-[#8a7569] block">Verification code sent to:</span>
-              <span className="text-xs font-bold text-[#D57C63] font-mono block truncate">{email}</span>
-              <p className="text-[10px] text-[#bcab9e] mt-1">
-                ⏱️ Code valid for 15 minutes. Check inbox &amp; spam folder.
-              </p>
+        {/* STEP 1B: SIGN IN */}
+        {mode === 'signin' && (
+          <form onSubmit={handleLogin} className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-neutral-400 absolute left-3.5 top-3" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="client@company.com"
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-neutral-200 dark:border-[#38261e] bg-neutral-50/70 dark:bg-[#20140e] text-neutral-900 dark:text-white placeholder:text-neutral-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#D57C63]/30 focus:border-[#D57C63] transition-all"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block text-[#d6c7bc] font-bold mb-1.5 text-center">
-                Enter 6-Digit Verification Code
+              <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">
+                Password
               </label>
-              <input
-                type="text"
-                required
-                maxLength={6}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                placeholder="000000"
-                className="w-full py-3 text-center tracking-[12px] font-mono font-bold text-2xl rounded-2xl bg-[#221612] border border-[#D57C63]/60 text-white focus:outline-none focus:border-[#ff7a1a]"
-              />
+              <div className="relative">
+                <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-3" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="w-full pl-10 pr-10 py-2 rounded-xl border border-neutral-200 dark:border-[#38261e] bg-neutral-50/70 dark:bg-[#20140e] text-neutral-900 dark:text-white placeholder:text-neutral-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#D57C63]/30 focus:border-[#D57C63] transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-2.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-white cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
-              disabled={loading || otp.length < 6}
-              className="w-full py-3 rounded-xl glow-btn text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+              disabled={loading}
+              className="w-full py-2.5 rounded-xl bg-[#D57C63] hover:bg-[#c2674e] text-white font-bold text-xs sm:text-sm uppercase tracking-wider transition-all duration-200 shadow-md hover:shadow-lg hover:shadow-[#D57C63]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
             >
               {loading ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
               ) : (
-                <ShieldCheck className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4" />
               )}
-              <span>Verify &amp; Activate Account</span>
+              <span>Sign In to Workspace</span>
             </button>
 
-            <div className="flex items-center justify-between pt-2 border-t border-[#291b15] text-[11px]">
+            <p className="text-center text-xs text-neutral-500 dark:text-neutral-400 pt-1">
+              Don't have an account yet?{' '}
               <button
                 type="button"
                 onClick={() => setMode('signup')}
-                className="text-[#8a7569] hover:text-white transition-colors cursor-pointer"
+                className="text-[#D57C63] font-bold hover:underline cursor-pointer"
               >
-                ← Edit Email
+                Create Account
+              </button>
+            </p>
+          </form>
+        )}
+
+        {/* STEP 2: VERIFICATION SCREEN (FIREBASE EMAIL VERIFICATION) */}
+        {mode === 'verify' && (
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-neutral-50 dark:bg-[#221612] border border-neutral-200 dark:border-[#38261e] text-center space-y-1">
+              <span className="text-[11px] text-neutral-500 dark:text-neutral-400 block">Verification link sent to:</span>
+              <span className="text-xs sm:text-sm font-bold text-[#D57C63] font-mono block truncate">{email}</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#D57C63]/10 border border-[#D57C63]/30 text-xs text-neutral-700 dark:text-neutral-200 space-y-2 leading-relaxed">
+              <div className="font-bold flex items-center gap-1.5 text-[#D57C63]">
+                <Sparkles className="w-4 h-4 shrink-0" />
+                <span>One Click Activation</span>
+              </div>
+              <p>
+                Open your email app, look for the verification email sent by Firebase, and click the confirmation link.
+              </p>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                Can't find it? Check your Spam or Promotions tab.
+              </p>
+            </div>
+
+            {/* Check Verification Status Button */}
+            <button
+              type="button"
+              onClick={handleCheckVerification}
+              disabled={checkingVerification}
+              className="w-full py-2.5 rounded-xl bg-[#D57C63] hover:bg-[#c2674e] text-white font-bold text-xs sm:text-sm uppercase tracking-wider transition-all duration-200 shadow-md hover:shadow-lg hover:shadow-[#D57C63]/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {checkingVerification ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-4 h-4" />
+              )}
+              <span>I Have Verified My Email</span>
+            </button>
+
+            {/* Resend Verification Button */}
+            <div className="flex items-center justify-between pt-1 border-t border-neutral-100 dark:border-[#291b15] text-xs">
+              <button
+                type="button"
+                onClick={() => setMode('signin')}
+                className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer"
+              >
+                ← Back to Sign In
               </button>
 
               <button
                 type="button"
-                onClick={handleResendOtp}
+                onClick={handleResendVerification}
                 disabled={resendCooldown > 0 || loading}
-                className="text-[#D57C63] hover:underline font-bold transition-all disabled:opacity-50 cursor-pointer"
+                className="text-[#D57C63] hover:underline font-bold disabled:opacity-50 cursor-pointer"
               >
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
+                {resendCooldown > 0 ? `Resend link in ${resendCooldown}s` : 'Resend Verification Link'}
               </button>
             </div>
-          </form>
+          </div>
         )}
-
-        <p className="text-[11px] text-[#8a7569] text-center mt-5">
-          🔒 Production-grade security: Passwords hashed with bcrypt; single-use SHA-256 tokens.
-        </p>
 
       </div>
     </div>
