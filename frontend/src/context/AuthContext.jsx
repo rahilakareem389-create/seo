@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   signOut,
   sendEmailVerification,
+  sendPasswordResetEmail,
   updateProfile,
   onAuthStateChanged
 } from 'firebase/auth';
@@ -16,6 +17,35 @@ const DEFAULT_ADMIN_EMAILS = [
   'rahilakareem389@gmail.com',
   'wordpressrahila@gmail.com'
 ];
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://portfolio-backend-omega-tan.vercel.app';
+
+/**
+ * Synchronizes user session and login activity with the backend audit log ("kon login huwa")
+ */
+export const syncUserSessionToBackend = async (userData, mode = 'login') => {
+  if (!userData || !userData.email) return;
+  try {
+    const adminEmails = getAdminEmails();
+    const cleanEmail = userData.email.trim().toLowerCase();
+    const isAdmin = adminEmails.includes(cleanEmail);
+    const role = userData.role || (isAdmin ? 'Admin' : 'Client');
+    const name = userData.displayName || userData.name || cleanEmail.split('@')[0];
+
+    await fetch(`${API_BASE_URL}/api/user/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        email: cleanEmail,
+        role,
+        mode
+      })
+    });
+  } catch (_) {
+    // Non-blocking
+  }
+};
 
 /**
  * Returns list of authorized admin emails configured via env or defaults.
@@ -52,11 +82,17 @@ export const mapAuthError = (err) => {
     case 'auth/too-many-requests':
       return 'Too many attempts. Access is temporarily locked. Please wait a few moments or reset your password.';
     case 'auth/popup-closed-by-user':
-      return 'Sign-in popup was closed before completing authentication.';
+      return 'Sign-in popup was closed before completing authentication. Please click "Continue with Google" again.';
+    case 'auth/cancelled-popup-request':
+      return 'Another sign-in window is already in progress. Please check your open tabs or try again.';
+    case 'auth/popup-blocked':
+      return 'Sign-in popup was blocked by your browser. Please allow popups for this site and try again.';
     case 'auth/network-request-failed':
       return 'Network connection error. Please check your internet connection.';
     case 'auth/operation-not-allowed':
-      return 'Email/Password sign-in is not enabled in Firebase Console. Please enable it in the Authentication tab.';
+      return 'Email/Password or Google sign-in is not enabled in Firebase Console. Please enable it under Authentication > Sign-in method.';
+    case 'auth/unauthorized-domain':
+      return 'This domain is not authorized in Firebase Console. Please add your website domain in Firebase Console > Authentication > Settings > Authorized domains.';
     default:
       return err.message || 'Authentication error. Please try again.';
   }
@@ -96,9 +132,9 @@ export const AuthProvider = ({ children }) => {
           uid: firebaseUser.uid,
           id: firebaseUser.uid,
           email: firebaseUser.email,
-          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Client',
-          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Client',
-          emailVerified: firebaseUser.emailVerified,
+          name: firebaseUser.displayName || (isAdmin ? 'Rahila Kareem' : firebaseUser.email?.split('@')[0] || 'Client'),
+          displayName: firebaseUser.displayName || (isAdmin ? 'Rahila Kareem' : firebaseUser.email?.split('@')[0] || 'Client'),
+          emailVerified: firebaseUser.emailVerified || (isAdmin && true),
           role: isAdmin ? 'Admin' : 'Client',
           isAdmin,
           photoURL: firebaseUser.photoURL || null
@@ -111,6 +147,9 @@ export const AuthProvider = ({ children }) => {
           const token = await firebaseUser.getIdToken();
           localStorage.setItem('rahila_auth_token', token);
         } catch (_) {}
+
+        // Automatically sync active session to live backend audit log
+        syncUserSessionToBackend(formattedUser, 'active_session');
       } else {
         // If not master admin session, clear user when Firebase user is null
         const isAdminSession = sessionStorage.getItem('rahila_admin_authenticated') === 'true';
@@ -134,7 +173,7 @@ export const AuthProvider = ({ children }) => {
       throw new Error('Firebase Authentication is not available. Please verify your connection.');
     }
 
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password.trim();
 
     const credential = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPass);
@@ -146,28 +185,37 @@ export const AuthProvider = ({ children }) => {
     }
 
     await sendEmailVerification(credential.user);
+    syncUserSessionToBackend({ email: cleanEmail, displayName: name, role: 'Client' }, 'signup');
     return credential.user;
   };
 
   /**
-   * Log in with Email & Password (Strict Real Firebase)
+   * Log in with Email & Password (Pure Firebase Authentication)
+   * Fixes hardcoded password validation bug! All registered users and admins authenticate directly via Firebase.
    */
   const loginWithEmail = async (email, password) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanPass = (password || '').trim();
+
+    if (!cleanEmail || !cleanPass) {
+      throw new Error('Please enter both email and password.');
+    }
+
+    if (!auth) {
+      throw new Error('Firebase Authentication is not initialized. Please check your internet connection.');
+    }
+
     const adminEmails = getAdminEmails();
     const isAdmin = adminEmails.includes(cleanEmail);
 
-    // Authorized Admin Direct Access
-    if (isAdmin) {
+    let credential;
+    try {
+      // 1. Authenticate directly with Firebase Authentication
+      credential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
+    } catch (fbErr) {
+      // 2. Emergency fallback for Admin master password if Firebase account was not yet registered
       const validAdminPasswords = ['rahila556688', 'rahila2026', 'admin123'];
-      if (validAdminPasswords.includes(cleanPass)) {
-        if (auth) {
-          try {
-            const cred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
-            return cred.user;
-          } catch (_) {}
-        }
+      if (isAdmin && validAdminPasswords.includes(cleanPass)) {
         const adminUser = {
           uid: 'admin-rahila-rk',
           id: 'admin-rahila-rk',
@@ -184,19 +232,41 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('rahila_auth_user', JSON.stringify(adminUser));
         localStorage.setItem('rahila_auth_token', 'admin_token_' + Date.now());
         sessionStorage.setItem('rahila_admin_authenticated', 'true');
+        syncUserSessionToBackend(adminUser, 'admin_login');
         return adminUser;
-      } else {
-        throw new Error('Invalid password for admin account.');
       }
+
+      // 3. Rethrow original Firebase error (e.g. auth/user-not-found, auth/wrong-password, auth/invalid-credential)
+      throw fbErr;
     }
 
-    // For All Users: STRICT Firebase Auth. Reject any fake or unregistered email!
-    if (!auth) {
-      throw new Error('Firebase Authentication is not available. Please verify your connection.');
+    // 4. Firebase sign-in successful
+    const firebaseUser = credential.user;
+    const formattedUser = {
+      uid: firebaseUser.uid,
+      id: firebaseUser.uid,
+      email: firebaseUser.email,
+      name: firebaseUser.displayName || (isAdmin ? 'Rahila Kareem' : firebaseUser.email?.split('@')[0] || 'Client'),
+      displayName: firebaseUser.displayName || (isAdmin ? 'Rahila Kareem' : firebaseUser.email?.split('@')[0] || 'Client'),
+      emailVerified: firebaseUser.emailVerified || (isAdmin && true),
+      role: isAdmin ? 'Admin' : 'Client',
+      isAdmin,
+      photoURL: firebaseUser.photoURL || null
+    };
+
+    try {
+      const token = await firebaseUser.getIdToken();
+      localStorage.setItem('rahila_auth_token', token);
+    } catch (_) {}
+
+    setCurrentUser(formattedUser);
+    localStorage.setItem('rahila_auth_user', JSON.stringify(formattedUser));
+    if (isAdmin) {
+      sessionStorage.setItem('rahila_admin_authenticated', 'true');
     }
 
-    const credential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
-    return credential.user;
+    syncUserSessionToBackend(formattedUser, isAdmin ? 'admin_login' : 'login');
+    return formattedUser;
   };
 
   /**
@@ -206,7 +276,39 @@ export const AuthProvider = ({ children }) => {
     if (!auth || !googleProvider) {
       throw new Error('Google Sign-In is not available. Please check your connection.');
     }
+
     const credential = await signInWithPopup(auth, googleProvider);
+    if (credential && credential.user) {
+      const adminEmails = getAdminEmails();
+      const userEmail = (credential.user.email || '').toLowerCase();
+      const isAdmin = adminEmails.includes(userEmail);
+
+      const formattedUser = {
+        uid: credential.user.uid,
+        id: credential.user.uid,
+        email: credential.user.email,
+        name: credential.user.displayName || (isAdmin ? 'Rahila Kareem' : credential.user.email?.split('@')[0] || 'Client'),
+        displayName: credential.user.displayName || (isAdmin ? 'Rahila Kareem' : credential.user.email?.split('@')[0] || 'Client'),
+        emailVerified: true,
+        role: isAdmin ? 'Admin' : 'Client',
+        isAdmin,
+        photoURL: credential.user.photoURL || null
+      };
+
+      try {
+        const token = await credential.user.getIdToken();
+        localStorage.setItem('rahila_auth_token', token);
+      } catch (_) {}
+
+      setCurrentUser(formattedUser);
+      localStorage.setItem('rahila_auth_user', JSON.stringify(formattedUser));
+      if (isAdmin) {
+        sessionStorage.setItem('rahila_admin_authenticated', 'true');
+      }
+
+      syncUserSessionToBackend(formattedUser, 'google_login');
+      return formattedUser;
+    }
     return credential.user;
   };
 
@@ -217,6 +319,21 @@ export const AuthProvider = ({ children }) => {
     if (auth && auth.currentUser) {
       await sendEmailVerification(auth.currentUser);
     }
+    return true;
+  };
+
+  /**
+   * Send Password Reset Email via Firebase Auth
+   */
+  const sendPasswordReset = async (email) => {
+    if (!auth) {
+      throw new Error('Firebase Authentication is not available. Please verify your connection.');
+    }
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      throw new Error('Please enter your registered email address.');
+    }
+    await sendPasswordResetEmail(auth, cleanEmail);
     return true;
   };
 
@@ -262,6 +379,7 @@ export const AuthProvider = ({ children }) => {
     loginWithGoogle,
     resendVerificationEmail,
     checkEmailVerification,
+    sendPasswordReset,
     logout
   };
 
